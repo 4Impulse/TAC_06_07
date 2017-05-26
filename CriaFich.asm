@@ -19,7 +19,7 @@ DADOS SEGMENT
 	fhandle dw	0
 	buffer	db	'Definicoes de informatica por Murphy:',13,10
 		db 	'+--------------------------------------------------------------------------+',13,10
-		db 	' Software: partes do sistema informatico que nao funcionam.                 ',13,10
+		db 	' ABCDEFGH: partes do sistema informatico que nao funcionam.                 ',13,10
 		db	' Perifericos: partes do sistema informatico que sao incompativeis com este. ',13,10 
 		db 	' Cabo: parte do sistema informatico que e sempre demasiado curta.           ',13,10
 		db	' Copia de seguranca: uma operacao que nunca e feita a tempo.                ',13,10
