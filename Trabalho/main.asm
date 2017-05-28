@@ -46,7 +46,8 @@ ENDM
 
 dseg   	segment para public 'data'
 
-	;					VARIAVEIS PARA O RELOGIO E DATA
+	;				VARIAVEIS PARA O RELOGIO E DATA
+	;------------------------------------------------------------------------
 	STR12	 		DB 		"            "	; String para 12 digitos	
 	NUMERO			DB		"                    $" 	; String destinada a guardar o número lido
 	POSy			db	10	; a linha pode ir de [1 .. 25]
@@ -56,6 +57,7 @@ dseg   	segment para public 'data'
 	NUM_SP			db		"                    $" 	; PAra apagar zona de ecran
 	
 	;				ESCREVER FICHEIRO / LER FICHEIRO
+	;------------------------------------------------------------------------
 	fname			db	'ABC.TXT',0
 	fhandle 		dw	0
 	
@@ -64,7 +66,8 @@ dseg   	segment para public 'data'
 	msgErrorClose	db	"Ocorreu um erro no fecho do ficheiro!$"
 
 
-	;						MENU	
+	;				MENU
+	;------------------------------------------------------------------------	
 	menu0_str		db	'         ___  ___  ___   ______ _____  ______  _   _  _   _  _____ ______     ',13,10
 					db	'         |  \/  | / _ \ |___  /|  ___| | ___ \| | | || \ | ||  ___|| ___ \     ',13,10
 					db	'         | .  . |/ /_\ \   / / | |__   | |_/ /| | | ||  \| || |__  | |_/ /     ',13,10
@@ -83,22 +86,22 @@ dseg   	segment para public 'data'
 					db	'                                                                               ',13,10
 					db  '$'
 	menu1_str		db	'+-----------------------------------------------------------------------------+',13,10
-					db	'                                1. Escolher Labirinto                          ',13,10
-					db	'                                2. Voltar atras                                ',13,10
+					db	'                                1. Voltar atras                                ',13,10
+					db	'                                2. Escolher Labirinto                          ',13,10
 					db	'+-----------------------------------------------------------------------------+',13,10
 					db	'                                                                               ',13,10
 					db  '$'
 
 	menu2_str		db	'+-----------------------------------------------------------------------------+',13,10
-					db	'                                1. Listar TOP 10                               ',13,10
-					db	'                                2. Voltar atras                                ',13,10
+					db	'                                1. Voltar atras                                ',13,10
+					db	'                                2. Mostrar Top10                               ',13,10
 					db	'+-----------------------------------------------------------------------------+',13,10
 					db	'                                                                               ',13,10
 					db  '$'
 
 	menu3_str		db	'+-----------------------------------------------------------------------------+',13,10
-					db	'                                1. Carregar Labirinto                          ',13,10
-					db	'                                2. Voltar atras                                ',13,10
+					db	'                                1. Voltar atras                                ',13,10
+					db	'                                2. Carregar Labirinto                          ',13,10
 					db	'+-----------------------------------------------------------------------------+',13,10
 					db	'                                                                               ',13,10
 					db  '$'
@@ -191,7 +194,7 @@ GOTO_XY 0,5
 
 		GOTO_XY 79,24
 		call 	LE_TECLA
-	voltar1_0: CMP 	AL, 50			; TECLA dois
+	voltar1_0: CMP 	AL, 49			; TECLA um
 	je menu_0
 jmp menu_1
 ;-------------------------------------------------------------------------------
@@ -207,7 +210,7 @@ GOTO_XY 0,5
 
 		GOTO_XY 79,24
 		call 	LE_TECLA
-	voltar2_0: CMP 	AL, 50			; TECLA dois
+	voltar2_0: CMP 	AL, 49			; TECLA um
 	je menu_0
 jmp menu_2
 ;-------------------------------------------------------------------------------
@@ -223,7 +226,7 @@ GOTO_XY 0,5
 
 		GOTO_XY 79,24
 		call 	LE_TECLA
-	voltar3_0: CMP 	AL, 50			; TECLA dois
+	voltar3_0: CMP 	AL, 49			; TECLA um
 	je menu_0
 jmp menu_3
 ;-------------------------------------------------------------------------------
