@@ -1,0 +1,6 @@
+TOP 10:
+
+Nome:	Tempo:
+Joao	20
+Maria	17
+Manel	15
