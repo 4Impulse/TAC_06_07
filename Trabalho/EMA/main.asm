@@ -61,7 +61,7 @@ dseg   	segment para public 'data'
 	Erro_Open       db      'Erro ao tentar abrir o ficheiro$'
     Erro_Ler_Msg    db      'Erro ao tentar ler do ficheiro$'
     Erro_Close      db      'Erro ao tentar fechar o ficheiro$'
-    Fich         	db      'TOP10.TXT',0
+    Fich         	db      'TOP10.txt$'
     HandleFich      dw      0
     car_fich        db      ?
 
@@ -152,9 +152,9 @@ main		proc
 ;############################################################# |_|  |_|\___|_| |_|\__,_| #######################################################
 
 menu:	call 	LE_TECLA
-quatro: CMP 	AL, 52		; TECLA QUATRO
+quatro: CMP 	AL, '4'		; TECLA QUATRO
 		JE		FIM
-dois:	CMP 	AL, 32		; TECLA DOIS
+dois:	CMP 	AL, '2'		; TECLA DOIS
 		je 		abre_ficheiro
 
 		jmp menu 			; nao leu nenhuma das opçoes retorna ao inicio do menu
@@ -168,6 +168,7 @@ dois:	CMP 	AL, 32		; TECLA DOIS
  ;###################################|______\___|_|\__|\__,_|_|  \__,_|  \__,_|\___/  |_|    |_|\___|_| |_|\___|_|_|  \___/ #######################################
 
 abre_ficheiro:
+        GOTO_XY 0,17
         mov     ah,3dh			; vamos abrir ficheiro para leitura 
         mov     al,0			; tipo de ficheiro	
         lea     dx,Fich			; nome do ficheiro
@@ -180,7 +181,7 @@ erro_abrir:
         mov     ah,09h
         lea     dx,Erro_Open
         int     21h
-        jmp     fim
+        jmp     termina_fich
 
 ler_ciclo:
         mov     ah,3fh			; indica que vai ser lido um ficheiro 
@@ -205,11 +206,15 @@ fecha_ficheiro:					; vamos fechar o ficheiro
         mov     ah,3eh
         mov     bx,HandleFich
         int     21h
-        jnc     fim
+        jnc     termina_fich
 
         mov     ah,09h			; o ficheiro pode não fechar correctamente
         lea     dx,Erro_Close
         Int     21h
+
+termina_fich:
+	GOTO_XY 80,25
+	call menu
 
 fim:
 	GOTO_XY 24,0
