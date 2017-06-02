@@ -65,6 +65,9 @@ dseg   	segment para public 'data'
     HandleFich      dw      0
     car_fich        db      ?
 
+    ;				MOSTRAR PARA VOLTAR AO MENU
+    Volta_Menu		db 		'Para voltar ao menu Prima "5" $'
+
 
 	;						MENU	
 	menu_str		db	'         ___  ___  ___   ______ _____  ______  _   _  _   _  _____ ______     ',13,10
@@ -73,6 +76,10 @@ dseg   	segment para public 'data'
 					db	'         | |\/| ||  _  |  / /  |  __|  |    / | | | || . ` ||  __| |    /      ',13,10
 					db	'         | |  | || | | |./ /___| |___  | |\ \ | |_| || |\  || |___ | |\ \      ',13,10
 					db	'         \_|  |_/\_| |_/\_____/\____/  \_| \_| \___/ \_| \_/\____/ \_| \_|     ',13,10
+					db	'                                                                               ',13,10	
+					db	'                                                                               ',13,10
+					db	'                                                                               ',13,10
+					db	'                                                                               ',13,10						
 					db	'+-----------------------------------------------------------------------------+',13,10
 					db	'                                1. Jogar                                       ',13,10
 					db	'                                2. TOP 10                                      ',13,10
@@ -130,19 +137,16 @@ LE_TECLA	endp
 ;								MAIN
 ;------------------------------------------------------------------------
 
-main		proc
-	mov     ax, dseg
-	mov     ds, ax
-
-	mov		ax,0B800h 		; memoria de video
-	mov		es,ax
-	
+main	proc
+		mov     ax, dseg
+		mov     ds, ax
+		mov		ax,0B800h 		; memoria de video
+		mov		es,ax
+		
 		GOTO_XY 0,5
-
 		call	apaga_ecran
 		MOSTRA 	menu_str
-
-		GOTO_XY 79,24
+		GOTO_XY 80,25
 
 ;#############################################################  __  __                   #######################################################
 ;############################################################# |  \/  |                  #######################################################
@@ -152,23 +156,37 @@ main		proc
 ;############################################################# |_|  |_|\___|_| |_|\__,_| #######################################################
 
 menu:	call 	LE_TECLA
-quatro: CMP 	AL, '4'		; TECLA QUATRO
-		JE		FIM
-dois:	CMP 	AL, '2'		; TECLA DOIS
-		je 		abre_ficheiro
 
-		jmp menu 			; nao leu nenhuma das opçoes retorna ao inicio do menu
+		um:		cmp 	al, '1'			; TECLA UM
+				je 		fim
+		dois:	CMP 	AL, '2'			; TECLA DOIS
+				je 		abre_ficheiro
+		tres:	CMP 	al, '3'			; TECLA TRES
+				JE 		fim
+		quatro: CMP 	AL, '4'			; TECLA QUATRO
+				JE		FIM
+		jmp menu 						; nao leu nenhuma das opçoes retorna ao inicio do menu
 
 
- ;################################### _          _ _                         _         ______ _      _          _           #######################################
- ;###################################| |        (_) |                       | |       |  ____(_)    | |        (_)          #######################################
- ;###################################| |     ___ _| |_ _   _ _ __ __ _    __| | ___   | |__   _  ___| |__   ___ _ _ __ ___  #######################################
- ;###################################| |    / _ \ | __| | | | '__/ _` |  / _` |/ _ \  |  __| | |/ __| '_ \ / _ \ | '__/ _ \ #######################################
- ;###################################| |___|  __/ | |_| |_| | | | (_| | | (_| | (_) | | |    | | (__| | | |  __/ | | | (_) |#######################################
- ;###################################|______\___|_|\__|\__,_|_|  \__,_|  \__,_|\___/  |_|    |_|\___|_| |_|\___|_|_|  \___/ #######################################
+menu_volta:	call LE_TECLA
+		
+		cinco:	cmp 	al, '5'			; TECLA cinco para voltar ao menu
+				je 		voltar_menu
+
+		jmp menu_volta
+
+;##################################### _          _ _                         _         ______ _      _          _           #######################################
+;#####################################| |        (_) |                       | |       |  ____(_)    | |        (_)          #######################################
+;#####################################| |     ___ _| |_ _   _ _ __ __ _    __| | ___   | |__   _  ___| |__   ___ _ _ __ ___  #######################################
+;#####################################| |    / _ \ | __| | | | '__/ _` |  / _` |/ _ \  |  __| | |/ __| '_ \ / _ \ | '__/ _ \ #######################################
+;#####################################| |___|  __/ | |_| |_| | | | (_| | | (_| | (_) | | |    | | (__| | | |  __/ | | | (_) |#######################################
+;#####################################|______\___|_|\__|\__,_|_|  \__,_|  \__,_|\___/  |_|    |_|\___|_| |_|\___|_|_|  \___/ #######################################
 
 abre_ficheiro:
-        GOTO_XY 0,17
+		call	apaga_ecran
+		GOTO_XY	0,0
+		MOSTRA 	Volta_Menu
+		GOTO_XY 0,4
         mov     ah,3dh			; vamos abrir ficheiro para leitura 
         mov     al,0			; tipo de ficheiro	
         lea     dx,Fich			; nome do ficheiro
@@ -184,18 +202,18 @@ erro_abrir:
         jmp     termina_fich
 
 ler_ciclo:
-        mov     ah,3fh			; indica que vai ser lido um ficheiro 
-        mov     bx,HandleFich		; bx deve conter o Handle do ficheiro previamente aberto 
+		mov     ah,3fh			; indica que vai ser lido um ficheiro 
+        mov     bx,HandleFich	; bx deve conter o Handle do ficheiro previamente aberto 
         mov     cx,1			; numero de bytes a ler 
         lea     dx,car_fich		; vai ler para o local de memoria apontado por dx (car_fich)
         int     21h				; faz efectivamente a leitura
-	  jc	    erro_ler		; se carry é porque aconteceu um erro
-	  cmp	    ax,0			;EOF?	verifica se já estamos no fim do ficheiro 
-	  je	    fecha_ficheiro	; se EOF fecha o ficheiro 
+	  	jc	    erro_ler		; se carry é porque aconteceu um erro
+	  	cmp	    ax,0			; EOF?	verifica se já estamos no fim do ficheiro 
+	  	je	    fecha_ficheiro	; se EOF fecha o ficheiro 
         mov     ah,02h			; coloca o caracter no ecran
-	  mov	    dl,car_fich		; este é o caracter a enviar para o ecran
-	  int	    21h				; imprime no ecran
-	  jmp	    ler_ciclo		; continua a ler o ficheiro
+	  	mov	    dl,car_fich		; este é o caracter a enviar para o ecran
+	  	int	    21h				; imprime no ecran
+	  	jmp	    ler_ciclo		; continua a ler o ficheiro
 
 erro_ler:
         mov     ah,09h
@@ -212,9 +230,16 @@ fecha_ficheiro:					; vamos fechar o ficheiro
         lea     dx,Erro_Close
         Int     21h
 
+voltar_menu:
+		GOTO_XY 0,5
+		call	apaga_ecran
+		MOSTRA 	menu_str
+		GOTO_XY 80,25
+		call 	menu
+
 termina_fich:
 	GOTO_XY 80,25
-	call menu
+	call menu_volta
 
 fim:
 	GOTO_XY 24,0
