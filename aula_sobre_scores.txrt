@@ -1,0 +1,11 @@
+supondo que:
+	(AL) AX pontuaçao
+	DX nome
+
+000000000 1
+
+carregar do ficheiro po buffer;
+
+SI apontado para o inicio do buffer,
+e a pontuaçao esta em 10,
+SI+10

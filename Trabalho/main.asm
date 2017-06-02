@@ -58,12 +58,15 @@ dseg   	segment para public 'data'
 	
 	;				ESCREVER FICHEIRO / LER FICHEIRO
 	;------------------------------------------------------------------------
-	fname			db	'ABC.TXT',0
-	fhandle 		dw	0
-	
-	msgErrorCreate	db	"Ocorreu um erro na criacao do ficheiro!$"
-	msgErrorWrite	db	"Ocorreu um erro na escrita para ficheiro!$"
-	msgErrorClose	db	"Ocorreu um erro no fecho do ficheiro!$"
+	Erro_Open       db      'Erro ao tentar abrir o ficheiro$'
+    Erro_Ler_Msg    db      'Erro ao tentar ler do ficheiro$'
+    Erro_Close      db      'Erro ao tentar fechar o ficheiro$'
+    Fich         	db      'TOP10.txt$'
+    HandleFich      dw      0
+    car_fich        db      ?
+
+    ;				MOSTRAR PARA VOLTAR AO MENU
+    Volta_Menu		db 		'Para voltar ao menu Prima "5" $'
 
 
 	;				MENU
@@ -148,6 +151,70 @@ SAI_TECLA:	RET
 LE_TECLA	endp
 
 ;------------------------------------------------------------------------
+; LOAD_SCORE - Carrega score Emma
+;------------------------------------------------------------------------
+
+LOAD_SCORE PROC
+
+abre_ficheiro:
+		call	apaga_ecran
+		GOTO_XY	0,0
+		MOSTRA 	Volta_Menu
+		GOTO_XY 0,4
+        mov     ah,3dh			; vamos abrir ficheiro para leitura 
+        mov     al,0			; tipo de ficheiro	
+        lea     dx,Fich			; nome do ficheiro
+        int     21h				; abre para leitura 
+        jc      erro_abrir		; pode aconter erro a abrir o ficheiro 
+        mov     HandleFich,ax		; ax devolve o Handle para o ficheiro 
+        jmp     ler_ciclo		; depois de abero vamos ler o ficheiro 
+
+erro_abrir:
+        mov     ah,09h
+        lea     dx,Erro_Open
+        int     21h
+        jmp     termina_fich
+
+ler_ciclo:
+		mov     ah,3fh			; indica que vai ser lido um ficheiro 
+        mov     bx,HandleFich	; bx deve conter o Handle do ficheiro previamente aberto 
+        mov     cx,1			; numero de bytes a ler 
+        lea     dx,car_fich		; vai ler para o local de memoria apontado por dx (car_fich)
+        int     21h				; faz efectivamente a leitura
+	  	jc	    erro_ler		; se carry é porque aconteceu um erro
+	  	cmp	    ax,0			; EOF?	verifica se já estamos no fim do ficheiro 
+	  	je	    fecha_ficheiro	; se EOF fecha o ficheiro 
+        mov     ah,02h			; coloca o caracter no ecran
+	  	mov	    dl,car_fich		; este é o caracter a enviar para o ecran
+	  	int	    21h				; imprime no ecran
+	  	jmp	    ler_ciclo		; continua a ler o ficheiro
+
+erro_ler:
+        mov     ah,09h
+        lea     dx,Erro_Ler_Msg
+        int     21h
+
+fecha_ficheiro:					; vamos fechar o ficheiro 
+        mov     ah,3eh
+        mov     bx,HandleFich
+        int     21h
+        jnc     termina_fich
+
+        mov     ah,09h			; o ficheiro pode não fechar correctamente
+        lea     dx,Erro_Close
+        Int     21h
+
+termina_fich:
+
+		call 	LE_TECLA
+		CMP 	AL, 53
+		JNE termina_fich
+		;ret
+
+
+LOAD_SCORE endp
+
+;------------------------------------------------------------------------
 ;								MAIN
 ;------------------------------------------------------------------------
 
@@ -161,6 +228,7 @@ main		proc
 ; MENU 0 - MENU INICIAL
 ;-------------------------------------------------------------------------------
 menu_0:	
+		mov al, 0
 		GOTO_XY 0,5
 
 		call	apaga_ecran
@@ -203,16 +271,8 @@ jmp menu_1
 ; MENU 2 - MENU DO SCORES
 ;-------------------------------------------------------------------------------
 menu_2:
-GOTO_XY 0,5
-
-		call	apaga_ecran
-		MOSTRA 	menu2_str
-
-		GOTO_XY 79,24
-		call 	LE_TECLA
-	voltar2_0: CMP 	AL, 49			; TECLA um
-	je menu_0
-jmp menu_2
+call 	LOAD_SCORE
+jmp menu_0
 ;-------------------------------------------------------------------------------
 
 ;-------------------------------------------------------------------------------
