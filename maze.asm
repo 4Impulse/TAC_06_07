@@ -4,12 +4,12 @@
 ;   
 ;	ANO LECTIVO 2016/2017
 ;;--------------------------------------------------------------
-; Imprime valor da tecla numa posição do ecran na posição linha,coluna
+; Imprime valor da tecla numa posiÃ§Ã£o do ecran na posiÃ§Ã£o linha,coluna
 ;--------------------------------------------------------------
-;	Programa de demostração de várias rotinhas do sistema de 
-;	manipulação do ecrãn 
-;	Imprime um de vários caracteres na localização do cursor
-; 	Caracteres são seleccionadas com as teclas: 1, 2, 3, 4, e SPACE
+;	Programa de demostraÃ§Ã£o de vÃ¡rias rotinhas do sistema de 
+;	manipulaÃ§Ã£o do ecrÃ£n 
+;	Imprime um de vÃ¡rios caracteres na localizaÃ§Ã£o do cursor
+; 	Caracteres sÃ£o seleccionadas com as teclas: 1, 2, 3, 4, e SPACE
 ;
 ;		arrow keys to move 
 ;		press ESC to exit
@@ -20,7 +20,7 @@
 .stack 2048
 
 dseg	segment para public 'data'
-		string	db	"Teste prático de T.I",0
+		string	db	"Teste prÃ¡tico de T.I",0
 		Car		db	32
 		POSy		db	5	; a linha pode ir de [1 .. 25]
 		POSx		db	10	; POSx pode ir [1..80]	
@@ -35,7 +35,7 @@ assume		cs:cseg, ds:dseg
 ;########################################################################
 goto_xy	macro		POSx,POSy
 		mov		ah,02h
-		mov		bh,0		; numero da página
+		mov		bh,0		; numero da pÃ¡gina
 		mov		dl,POSx
 		mov		dh,POSy
 		int		10h
@@ -82,7 +82,7 @@ Main  proc
 
 		call		apaga_ecran
 
-		;Obter a posição
+		;Obter a posiÃ§Ã£o
 		dec		POSy		; linha = linha -1
 		dec		POSx		; POSx = POSx -1
 
@@ -100,7 +100,7 @@ IMPRIME:	mov		ah, 02h
 
 ZERO:		CMP 		AL, 48		; Tecla 0
 		JNE		UM
-		mov		Car, 32		;ESPAÇO
+		mov		Car, 32		;ESPAÃ‡O
 		jmp		CICLO					
 		
 UM:		CMP 		AL, 49		; Tecla 1
