@@ -11,9 +11,9 @@
 ;MACRO GOTO_XY
 ;------------------------------------------------------------------------
 ; COLOCA O CURSOR NA POSIÇÃO POSX,POSY
-;	POSX -> COLUNA
-;	POSY -> LINHA
-; 	REGISTOS USADOS
+;		POSX -> COLUNA
+;		POSY -> LINHA
+; REGISTOS USADOS
 ;		AH, BH, DL,DH (DX)
 ;------------------------------------------------------------------------
 GOTO_XY		MACRO	POSX,POSY
@@ -386,11 +386,17 @@ M_sai:
 LOAD_SCREEN endp
 
 ;------------------------------------------------------------------------
-; LOAD_MAZE - Carrega Labirinto para o ecra Return (AH=0) Ok (AH=1) ERRO
+; LOAD_MAZE - Carrega Labirinto para o ecra 
+;									Inicio (AH=1) Carrega Ecra (AH=0) nop
+;									Return (AH=0) Ok (AH=1) ERRO
 ;------------------------------------------------------------------------
 LOAD_MAZE PROC
+	
+	cmp ah, 1
+	jne inicio
 	call LOAD_SCREEN
-	GOTO_XY 0,0
+	
+inicio:	GOTO_XY 0,0
 
 	mov pos_Ix, 0
     mov pos_Iy, 0
@@ -808,10 +814,11 @@ jmp menu_0				; nao leu nenhuma das opçoes retorna ao inicio do menu
 ;-------------------------------------------------------------------------------
 menu_1:
 	call apaga_ecran
+	mov ah, 1 				;Load_MAZE tem input e output
 	call LOAD_MAZE
-	cmp al, 1
+	cmp al, 1				;Load_MAZE tem input e output
 	je c_erro
-	cmp al, 0
+	cmp al, 0				;Load_MAZE tem input e output
 	je s_erro
 		c_erro:
 		 goto_xy 0, 0
@@ -859,6 +866,7 @@ GOTO_XY 0,5
 		jne menu_3
 		call		apaga_ecran
 		call 		LOAD_MAZEGEN
+		mov ah, 0					;Load_MAZE tem input e output
 		call 		LOAD_MAZE
 		call 		CONFIG_MAZE
 	jmp menu_3
