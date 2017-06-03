@@ -168,7 +168,6 @@ dseg   	segment para public 'data'
 
     ; 				Ficheiros Labirinto
     Erro_Campo		db		'Campo com formato incorrecto$'
-    defaultFile     db      'field.TXT$',0
     game_screen     db      'ecra.TXT$',0
     HandleFile      dw      0
 
@@ -177,7 +176,9 @@ dseg   	segment para public 'data'
 
     ; 				Ficheiros Configs
     mazegen         db      'mazegen.TXT',0
-    save_file 	    db 		'maze1.TXT',0
+    selectedMaze	db 		'          ',0
+    defaultMaze     db      'maze1.TXT$',0
+    savedMaze 	    db 		'maze2.TXT$',0
 
     ;				MOSTRAR PARA VOLTAR AO MENU
     Volta_Menu		db 		'Para voltar ao menu Prima "5" $',0
@@ -221,10 +222,17 @@ dseg   	segment para public 'data'
 					db	'                                                                               ',13,10
 					db  '$'
 
-	menu3_str		db	'+-----------------------------------------------------------------------------+',13,10
+	menu3_str		db	'                             ______            _____                           ',13,10
+					db	'                            / ____/___  ____  / __(_)___ ______                ',13,10
+					db	'                           / /   / __ \/ __ \/ /_/ / __ `/ ___/                ',13,10
+					db	'                          / /___/ /_/ / / / / __/ / /_/ (__  )                 ',13,10
+					db	'                          \____/\____/_/ /_/_/ /_/\__, /____/                  ',13,10
+					db	'                                                 /____/                        ',13,10
+					db	'                                                                               ',13,10
+					db	'+-----------------------------------------------------------------------------+',13,10
 					db	'                                1. Voltar atras                                ',13,10
-					db	'                                2. Carregar Labirinto                          ',13,10
-					db	'                                3. Criar Labirinto Novo                        ',13,10
+					db	'                                2. Carregar Labirinto Por Omissao              ',13,10
+					db	'                                3. Carregar Labirinto Personalizado            ',13,10
 					db	'                                4. Editar Labirinto Carregado                  ',13,10
 					db	'+-----------------------------------------------------------------------------+',13,10
 					db	'                                                                               ',13,10
@@ -413,7 +421,7 @@ inicio:	GOTO_XY 0,0
 	mov 	HandleFile, 0
     mov     ah,3dh			; vamos abrir ficheiro para leitura 
     mov     al,0			; tipo de ficheiro	
-    lea     dx,defaultFile	; nome do ficheiro
+    lea     dx,selectedMaze	; nome do ficheiro
     int     21h				; abre para leitura 
     jc      erro_abrir		; pode aconter erro a abrir o ficheiro 
     mov     HandleFile,ax	; ax devolve o Handle para o ficheiro 
@@ -680,7 +688,7 @@ FINAL:		CMP 		AL, 'f'				; Tecla F
 
 GRAVAR:		CMP 		AL, 'g'				; Tecla G
 		JNE		S_GRAVAR
-		SAVE_MAZE save_file
+		SAVE_MAZE selectedMaze
 		jmp		fim
 
 S_GRAVAR:	CMP 		AL, 27				; Tecla ESC
@@ -770,6 +778,43 @@ M_sai:
 	ret
         
 LOAD_MAZEGEN endp
+
+;------------------------------------------------------------------------
+; SELECT_DEFAULT - copia defaultMaze para selectedMaze
+;------------------------------------------------------------------------
+SELECT_DEFAULT proc
+	mov bx, 0 ;imaginar em C == i=0;
+CICLO:
+	mov al, defaultMaze[bx]
+	cmp al, 0
+	JE Sai		
+		mov selectedMaze[bx], al ;copia
+		inc BX 	;i++
+    JMP CICLO ;jump not equal
+ 
+    Sai:
+    	ret
+
+SELECT_DEFAULT endp
+
+
+;------------------------------------------------------------------------
+; SELECT_SAVED - copia savedMaze para selectedMaze
+;------------------------------------------------------------------------
+SELECT_SAVED proc
+	mov bx, 0 ;imaginar em C == i=0;
+CICLO:
+		mov al, savedMaze[bx]
+	cmp al, 0
+	JE Sai		
+		mov selectedMaze[bx], al ;copia
+		inc BX 	;i++
+    JMP CICLO ;jump not equal
+ 
+    Sai:
+    	ret
+
+SELECT_SAVED endp
 ;------------------------------------------------------------------------
 
 ;------------------------------------------------------------------------
@@ -856,11 +901,11 @@ GOTO_XY 0,5
 		je menu_0
 	voltar3_1: CMP 	AL, 50			; TECLA dois
 	jne voltar3_2
+	call SELECT_DEFAULT
+	jmp menu_3
 	voltar3_2: CMP 	AL, 51			; TECLA tres
-		jne voltar3_3
-		call		apaga_ecran
-		call 		LOAD_MAZEGEN
-		call 		CONFIG_MAZE
+	jne voltar3_3
+	call SELECT_SAVED
 	jmp menu_3
 	voltar3_3: CMP 	AL, 52			; TECLA quatro
 		jne menu_3
