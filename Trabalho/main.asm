@@ -169,6 +169,7 @@ dseg   	segment para public 'data'
     ; 				Ficheiros Labirinto
     Erro_Campo		db		'Campo com formato incorrecto$'
     defaultFile     db      'field.TXT$',0
+    game_screen     db      'ecra.TXT$',0
     HandleFile      dw      0
 
     ; 				Ficheiros Top10
@@ -334,9 +335,61 @@ termina_fich:
 LOAD_SCORE endp
 
 ;------------------------------------------------------------------------
+; LOAD_SCREEN - imprime o ficheiro game_screen
+;------------------------------------------------------------------------
+LOAD_SCREEN proc 
+        mov     ah,3dh			; vamos abrir ficheiro para leitura 
+        mov     al,0			; tipo de ficheiro	
+        lea     dx,game_screen		; nome do ficheiro
+        int     21h				; abre para leitura 
+        jc      M_erro_abrir	; pode aconter erro a abrir o ficheiro 
+        mov     HandleFich,ax	; ax devolve o Handle para o ficheiro 
+        jmp     M_ler_ciclo		; depois de abero vamos ler o ficheiro 
+
+M_erro_abrir:
+        mov     ah,09h
+        lea     dx,Erro_Open
+        int     21h
+        jmp     M_sai
+
+M_ler_ciclo:
+        mov     ah,3fh			; indica que vai ser lido um ficheiro 
+        mov     bx,HandleFich	; bx deve conter o Handle do ficheiro previamente aberto 
+        mov     cx,1			; numero de bytes a ler 
+        lea     dx,car_fich		; vai ler para o local de memoria apontado por dx (car_fich)
+        int     21h				; faz efectivamente a leitura
+	  jc	    M_erro_ler		; se carry é porque aconteceu um erro
+	  cmp	    ax,0			;EOF?	verifica se já estamos no fim do ficheiro 
+	  je	    M_fecha_ficheiro; se EOF fecha o ficheiro 
+        mov     ah,02h			; coloca o caracter no ecran
+	  mov	    dl,car_fich		; este é o caracter a enviar para o ecran
+	  int	    21h				; imprime no ecran
+	  jmp	    M_ler_ciclo		; continua a ler o ficheiro
+
+M_erro_ler:
+        mov     ah,09h
+        lea     dx,Erro_Ler_Msg
+        int     21h
+
+M_fecha_ficheiro:				; vamos fechar o ficheiro 
+        mov     ah,3eh
+        mov     bx,HandleFich
+        int     21h
+        jnc     M_sai
+
+        mov     ah,09h			; o ficheiro pode não fechar correctamente
+        lea     dx,Erro_Close
+        Int     21h
+M_sai:
+	ret
+        
+LOAD_SCREEN endp
+
+;------------------------------------------------------------------------
 ; LOAD_MAZE - Carrega Labirinto para o ecra Return (AH=0) Ok (AH=1) ERRO
 ;------------------------------------------------------------------------
 LOAD_MAZE PROC
+	call LOAD_SCREEN
 	GOTO_XY 0,0
 
 	mov pos_Ix, 0
