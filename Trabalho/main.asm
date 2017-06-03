@@ -176,7 +176,7 @@ dseg   	segment para public 'data'
 
     ; 				Ficheiros Configs
     mazegen         db      'mazegen.TXT',0
-    selectedMaze	db 		'          ',0
+    selectedMaze	db 		'maze1.TXT$',0
     defaultMaze     db      'maze1.TXT$',0
     savedMaze 	    db 		'maze2.TXT$',0
 
