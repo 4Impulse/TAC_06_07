@@ -11,9 +11,9 @@
 ;MACRO GOTO_XY
 ;------------------------------------------------------------------------
 ; COLOCA O CURSOR NA POSIÇÃO POSX,POSY
-;	POSX -> COLUNA
-;	POSY -> LINHA
-; 	REGISTOS USADOS
+;		POSX -> COLUNA
+;		POSY -> LINHA
+; REGISTOS USADOS
 ;		AH, BH, DL,DH (DX)
 ;------------------------------------------------------------------------
 GOTO_XY		MACRO	POSX,POSY
@@ -35,7 +35,9 @@ INT 21H
 ENDM
 ;------------------------------------------------------------------------
 
-
+;------------------------------------------------------------------------
+;	Le caracter pretendido
+;------------------------------------------------------------------------
 le_car macro car_fich
 		mov     ah, 3fh
      	mov     bx, HandleFich
@@ -50,6 +52,9 @@ le_car macro car_fich
 
 endm
 
+;-------------------------------------------------------------------------
+;	IMPRIME O CRACTER
+;-------------------------------------------------------------------------
 escreve_car macro
  		mov 	bx,	HandleFich			
 		mov		ah, 40h				
@@ -59,6 +64,107 @@ escreve_car macro
 endm
 
 
+;------------------------------------------------------------------------
+; SAVE_MAZE - Guarda as primeiras 40x20 celulas do ecra no ficheiro STR
+;------------------------------------------------------------------------
+SAVE_MAZE MACRO STR 
+mov		ah, 3ch					; Abrir o ficheiro para escrita
+		mov		cx, 00H			; Define o tipo de ficheiro ??
+		lea		dx, STR			; DX aponta para o nome do ficheiro 
+		int		21h				; Abre efectivamente o ficheiro (AX fica com o Handle do ficheiro)
+		mov 	HandleFich,ax
+		jnc		comeco			; Se não existir erro escreve no ficheiro
+	
+		mov		ah, 09h
+		lea		dx, msgErrorCreate
+		int		21h
+	
+		jmp		fimm
+		
+
+comeco:
+		mov POSy,0
+
+check_y:
+		cmp 	POSy,25
+		je 		fimm
+		mov 	POSx,0
+back:
+		goto_xy POSx,POSy
+		mov 	ah, 08h
+		mov		bh,0			; numero da página
+		int		10h		
+		mov		Char, al		; Guarda o Caracter que está na posição do Cursor
+		mov		Cor, ah			; Guarda a cor que está na posição do Cursor
+		cmp     Char,219		; Verifica se o que vai escrever é uma parede
+		je 		escreve_p
+		cmp     Char,176		;Verifica se o que vai escrever é o fim
+		je 		escreve_f
+		jmp 	escreve
+
+aumenta_Y:
+		inc 	POSx
+		cmp 	POSx,40
+		JNE 	back
+		inc 	POSy
+		jmp		escreve_enter
+
+	
+escreve:
+		mov 	bx,	HandleFich			
+		mov		ah, 40h				;indica que é para escrever
+		lea		dx, Char
+		mov 	cx,	1	
+		int		21H	
+		
+		jnc		aumenta_Y			; Se não existir erro na escrita continua
+	
+		mov		ah, 09h
+		lea		dx, msgErrorWrite
+		int		21h
+
+escreve_p:
+	mov Char,'#'
+	jmp escreve
+escreve_f:
+	mov Char,'F'
+	jmp escreve
+
+escreve_enter:
+		cmp 	POSy,20
+		je 		fimm
+		MOV 	char,13  
+		mov 	bx,	HandleFich			
+		mov		ah, 40h				
+		lea		dx, Char
+		mov 	cx,	1	
+		int		21H
+
+		MOV 	char,10  
+		mov 	bx,	HandleFich			
+		mov		ah, 40h				
+		lea		dx, Char
+		mov 	cx,	1	
+		int		21H
+
+		jnc		check_y	
+
+fimm:
+
+	mov bx,HandleFich	        	
+	mov	ah,3eh			; indica que vamos fechar
+	int	21h				; fecha mesmo
+	jnc	exit				; se não acontecer erro termina
+	
+	goto_xy 25,23
+	mov	ah, 09h
+	lea	dx, Erro_Close
+	int	21h
+
+exit:
+
+ENDM
+;------------------------------------------------------------------------
 
 .8086
 .model	small
@@ -70,7 +176,6 @@ endm
 
 dseg   	segment para public 'data'
 
-	;				VARIAVEIS PARA O RELOGIO E DATA
 	;------------------------------------------------------------------------	
 	matriz 			db 	10 dup(4 dup(0))
     tempo     		db  '0066'		
@@ -88,22 +193,36 @@ dseg   	segment para public 'data'
 	NUMDIG		db			0	; controla o numero de digitos do numero lido
 	MAXDIG		db			8	; Constante que define o numero MAXIMO de digitos a ser aceite
 
-	
+
 	;				ESCREVER FICHEIRO / LER FICHEIRO
 	;------------------------------------------------------------------------
 	Erro_Open       db      'Erro ao tentar abrir o ficheiro$'
     Erro_Ler_Msg    db      'Erro ao tentar ler do ficheiro$'
     Erro_Close      db      'Erro ao tentar fechar o ficheiro$'
+    msgErrorCreate	db		"Ocorreu um erro na criacao do ficheiro!$"
+	msgErrorWrite	db		"Ocorreu um erro na escrita para ficheiro!$"
     HandleFich      dw      0
     car_fich        db      ?
-        
 
     ; 				Ficheiros Labirinto
     Erro_Campo		db		'Campo com formato incorrecto$'
-    defaultFile     db      'field.TXT$',0
+    game_screen     db      'ecra.TXT$',0
     HandleFile      dw      0
 
+    ; 				Ficheiros Top10
+    Fich         	db      'TOP10.txt$',0
+
+    ; 				Ficheiros Configs
+    mazegen         db      'mazegen.TXT',0
+    selectedMaze	db 		'maze1.TXT$',0
+    defaultMaze     db      'maze1.TXT$',0
+    savedMaze 	    db 		'maze2.TXT$',0
+
+    ;				MOSTRAR PARA VOLTAR AO MENU
+    Volta_Menu		db 		'Para voltar ao menu Prima "5" $',0
+
     ;				VARIAVEIS PARA O LABIRINTO E AVATAR
+    ;------------------------------------------------------------------------
     pos_Ix			db 		0
     pos_Iy			db 		0
     flagI			db 		0
@@ -125,46 +244,39 @@ dseg   	segment para public 'data'
 
 	;				MENU
 	;------------------------------------------------------------------------	
-	menu0_str		db	'         ___  ___  ___   ______ _____  ______  _   _  _   _  _____ ______     ',13,10
+	menu0_str		db	'         ___  ___  ___   ______ _____  ______  _   _  _   _  _____ ______      ',13,10
 					db	'         |  \/  | / _ \ |___  /|  ___| | ___ \| | | || \ | ||  ___|| ___ \     ',13,10
 					db	'         | .  . |/ /_\ \   / / | |__   | |_/ /| | | ||  \| || |__  | |_/ /     ',13,10
 					db	'         | |\/| ||  _  |  / /  |  __|  |    / | | | || . ` ||  __| |    /      ',13,10
 					db	'         | |  | || | | |./ /___| |___  | |\ \ | |_| || |\  || |___ | |\ \      ',13,10
 					db	'         \_|  |_/\_| |_/\_____/\____/  \_| \_| \___/ \_| \_/\____/ \_| \_|     ',13,10
+					db	'                                                                               ',13,10
 					db	'+-----------------------------------------------------------------------------+',13,10
 					db	'                                1. Jogar                                       ',13,10
 					db	'                                2. TOP 10                                      ',13,10
 					db	'                                3. Configurar labirinto                        ',13,10
 					db	'                                4. Sair                                        ',13,10
 					db	'+-----------------------------------------------------------------------------+',13,10
-					db	'                                                                               ',13,10	
-					db	'                                                                               ',13,10
-					db	'                                                                               ',13,10
 					db	'                                                                               ',13,10
 					db  '$'
-	menu1_str		db	'+-----------------------------------------------------------------------------+',13,10
+
+	menu3_str		db	'                             ______            _____                           ',13,10
+					db	'                            / ____/___  ____  / __(_)___ ______                ',13,10
+					db	'                           / /   / __ \/ __ \/ /_/ / __ `/ ___/                ',13,10
+					db	'                          / /___/ /_/ / / / / __/ / /_/ (__  )                 ',13,10
+					db	'                          \____/\____/_/ /_/_/ /_/\__, /____/                  ',13,10
+					db	'                                                 /____/                        ',13,10
+					db	'                                                                               ',13,10
+					db	'+-----------------------------------------------------------------------------+',13,10
 					db	'                                1. Voltar atras                                ',13,10
-					db	'                                2. Escolher Labirinto                          ',13,10
+					db	'                                2. Carregar Labirinto Por Omissao              ',13,10
+					db	'                                3. Carregar Labirinto Personalizado            ',13,10
+					db	'                                4. Editar Labirinto Carregado                  ',13,10
 					db	'+-----------------------------------------------------------------------------+',13,10
 					db	'                                                                               ',13,10
 					db  '$'
 
-	menu2_str		db	'+-----------------------------------------------------------------------------+',13,10
-					db	'                                1. Voltar atras                                ',13,10
-					db	'                                2. Mostrar Top10                               ',13,10
-					db	'+-----------------------------------------------------------------------------+',13,10
-					db	'                                                                               ',13,10
-					db  '$'
-
-	menu3_str		db	'+-----------------------------------------------------------------------------+',13,10
-					db	'                                1. Voltar atras                                ',13,10
-					db	'                                2. Carregar Labirinto                          ',13,10
-					db	'+-----------------------------------------------------------------------------+',13,10
-					db	'                                                                               ',13,10
-					db  '$'
-
-
-    ganhou_str		db '                      _____             _                 _                ',13,10
+	ganhou_str		db '                      _____             _                 _                ',13,10
 					db '                     |  __ \           | |               | |               ',13,10
 					db '                     | |  \/ __ _ _ __ | |__   ___  _   _| |               ',13,10
 					db '                     | | __ / _` |  _ \|  _ \ / _ \| | | | |               ',13,10
@@ -177,6 +289,8 @@ dseg   	segment para public 'data'
 					db	'                                                                               ',13,10
 					db	'+-----------------------------------------------------------------------------+',13,10
 					db '$'
+
+
 dseg    	ends
 
 ;------------------------------------------------------------------------
@@ -276,6 +390,7 @@ LOAD_FILE endp
 ;------------------------------------------------------------------------
 ; LOAD_SCORE - Carrega score Emma
 ;------------------------------------------------------------------------
+
 LOAD_SCORE PROC
 	call apaga_ecran
 	lea dx,top_scores
@@ -705,14 +820,69 @@ save_score 	PROC
 			ret
 
 save_score endp
+;------------------------------------------------------------------------
+; LOAD_SCREEN - imprime o ficheiro game_screen
+;------------------------------------------------------------------------
+LOAD_SCREEN proc 
+        mov     ah,3dh			; vamos abrir ficheiro para leitura 
+        mov     al,0			; tipo de ficheiro	
+        lea     dx,game_screen		; nome do ficheiro
+        int     21h				; abre para leitura 
+        jc      M_erro_abrir	; pode aconter erro a abrir o ficheiro 
+        mov     HandleFich,ax	; ax devolve o Handle para o ficheiro 
+        jmp     M_ler_ciclo		; depois de abero vamos ler o ficheiro 
 
+M_erro_abrir:
+        mov     ah,09h
+        lea     dx,Erro_Open
+        int     21h
+        jmp     M_sai
+
+M_ler_ciclo:
+        mov     ah,3fh			; indica que vai ser lido um ficheiro 
+        mov     bx,HandleFich	; bx deve conter o Handle do ficheiro previamente aberto 
+        mov     cx,1			; numero de bytes a ler 
+        lea     dx,car_fich		; vai ler para o local de memoria apontado por dx (car_fich)
+        int     21h				; faz efectivamente a leitura
+	  jc	    M_erro_ler		; se carry é porque aconteceu um erro
+	  cmp	    ax,0			;EOF?	verifica se já estamos no fim do ficheiro 
+	  je	    M_fecha_ficheiro; se EOF fecha o ficheiro 
+        mov     ah,02h			; coloca o caracter no ecran
+	  mov	    dl,car_fich		; este é o caracter a enviar para o ecran
+	  int	    21h				; imprime no ecran
+	  jmp	    M_ler_ciclo		; continua a ler o ficheiro
+
+M_erro_ler:
+        mov     ah,09h
+        lea     dx,Erro_Ler_Msg
+        int     21h
+
+M_fecha_ficheiro:				; vamos fechar o ficheiro 
+        mov     ah,3eh
+        mov     bx,HandleFich
+        int     21h
+        jnc     M_sai
+
+        mov     ah,09h			; o ficheiro pode não fechar correctamente
+        lea     dx,Erro_Close
+        Int     21h
+M_sai:
+	ret
+        
+LOAD_SCREEN endp
 
 ;------------------------------------------------------------------------
-; LOAD_MAZE - Carrega Labirinto para o ecra Return (AH=0) Ok (AH=1) ERRO
+; LOAD_MAZE - Carrega Labirinto para o ecra 
+;									Inicio (AH=1) Carrega Ecra (AH=0) nop
+;									Return (AH=0) Ok (AH=1) ERRO
 ;------------------------------------------------------------------------
 LOAD_MAZE PROC
-	call apaga_ecran
-	GOTO_XY 0,0
+	
+	cmp ah, 1
+	jne inicio
+	call LOAD_SCREEN
+	
+inicio:	GOTO_XY 0,0
 
 	mov pos_Ix, 0
     mov pos_Iy, 0
@@ -729,7 +899,7 @@ LOAD_MAZE PROC
 	mov 	HandleFile, 0
     mov     ah,3dh			; vamos abrir ficheiro para leitura 
     mov     al,0			; tipo de ficheiro	
-    lea     dx,defaultFile	; nome do ficheiro
+    lea     dx,selectedMaze	; nome do ficheiro
     int     21h				; abre para leitura 
     jc      erro_abrir		; pode aconter erro a abrir o ficheiro 
     mov     HandleFile,ax	; ax devolve o Handle para o ficheiro 
@@ -877,10 +1047,12 @@ SAI_TECLA:
 		RET
 LE_TECLA_JOGO	ENDP
 
+
 ;------------------------------------------------------------------------
 ; JOGO
 ;------------------------------------------------------------------------
 JOGO PROC
+
 	mov Secs_de_jogo,0
 	mov Minus_de_jogo,0 
 
@@ -909,7 +1081,7 @@ CICLO:	goto_xy	POSx,POSy	; Vai para nova possição
 		cmp char,219		;Detetou parede!
 		JE volta 			;Logo volta a Pos anterior
 		cmp char,176		; DETETOU O FIM
-		jE  ENCONTROU		; SALTA PARA ENCONTROU
+		jE  ENCONTROU 		; vai para encontrou 
 		cmp POSx, 40		;Passou o limite do mapa X > 40 ....yeah I know
 		ja volta 			;Logo volta a Pos anterior
 		cmp POSy, 19 		;Passou o limite do mapa Y > 19
@@ -966,12 +1138,15 @@ Volta: 						;retorna a pos Anterior
 		jmp LER_SETA
 
 ENCONTROU:
-	call ganhou
-
+		call ganhou
 fim:	
 		ret
 
 JOGO endp
+
+;--------------------------------------------------------------------------
+; ENCONTROU
+;--------------------------------------------------------------------------
 
 ganhou PROC
 		Call 	apaga_ecran
@@ -988,6 +1163,192 @@ ganhou PROC
 		mov     ah,4ch
         int     21h	
 ganhou endp
+
+;------------------------------------------------------------------------
+; CONFIG_MAZE
+;------------------------------------------------------------------------
+CONFIG_MAZE proc
+
+mov POSx, 1
+mov POSy, 1
+
+CICLO:	goto_xy	POSx,POSy
+
+		cmp POSx, 39		;Passou o limite do mapa X > 40 ....yeah I know
+		ja volta 			;Logo volta a Pos anterior
+		cmp POSy, 19 		;Passou o limite do mapa Y > 19
+		ja volta
+
+IMPRIME:	mov		ah, 02h
+		goto_xy	POSx,POSy	; Vai para posição do cursor
+		mov		ah, 02h
+		mov		dl, char 	; Coloca AVATAR
+		int		21H	
+		goto_xy	POSxa,POSya	; Vai para a posição anterior do cursor
+		mov		ah, 02h
+		mov		dl, char	; Repoe Caracter guardado 
+		int		21H	
+		goto_xy	POSx,POSy	; Vai para posição do cursor
+		mov		al, POSx	; Guarda a posição do cursor
+		mov		POSxa, al
+		mov		al, POSy	; Guarda a posição do cursor
+		mov 	POSya, al
+		
+LER_SETA:		call 		LE_TECLA
+		cmp		ah, 1
+		je		ESTEND
+
+BRANCO:		CMP 		AL, 48				; Tecla 0
+		JNE		INICIAL
+		mov		Char, 32					;ESPAÇO
+		jmp		CICLO					
+		
+INICIAL:		CMP 		AL, 'i'			; Tecla I
+		JNE		PAREDE
+		mov		Char, 'I'			
+		jmp		CICLO		
+	
+PAREDE:		CMP 		AL, 'p'				; Tecla P
+		JNE		FINAL
+		mov		Char, 219					; #
+		jmp		CICLO			
+		
+FINAL:		CMP 		AL, 'f'				; Tecla F
+		JNE		GRAVAR
+		mov		Char, 'F'			
+		jmp		CICLO
+
+GRAVAR:		CMP 		AL, 'g'				; Tecla G
+		JNE		S_GRAVAR
+		SAVE_MAZE selectedMaze
+		jmp		fim
+
+S_GRAVAR:	CMP 		AL, 27				; Tecla ESC
+		JNE		CICLO
+		jmp		fim
+
+	
+ESTEND:	cmp 		al,48h
+		jne		BAIXO
+		dec		POSy				;cima
+		jmp		CICLO
+
+BAIXO:	cmp		al,50h
+		jne		ESQUERDA
+		inc 		POSy			;Baixo
+		jmp		CICLO
+
+ESQUERDA:
+		cmp		al,4Bh
+		jne		DIREITA
+		dec		POSx				;Esquerda
+		jmp		CICLO
+
+DIREITA:
+		cmp		al,4Dh
+		jne		CICLO 
+		inc		POSx				;Direita
+		jmp		CICLO
+Volta: 						;retorna a pos Anterior
+		mov al,POSya
+		mov POSy,al
+		mov al, POSxa
+		mov	POSx,al
+		jmp LER_SETA
+
+fim:	
+		ret
+CONFIG_MAZE endp
+
+;------------------------------------------------------------------------
+; LOAD_MAZEGEN - imprime o ficheiro mazegen
+;------------------------------------------------------------------------
+LOAD_MAZEGEN proc 
+        mov     ah,3dh			; vamos abrir ficheiro para leitura 
+        mov     al,0			; tipo de ficheiro	
+        lea     dx,mazegen		; nome do ficheiro
+        int     21h				; abre para leitura 
+        jc      M_erro_abrir	; pode aconter erro a abrir o ficheiro 
+        mov     HandleFich,ax	; ax devolve o Handle para o ficheiro 
+        jmp     M_ler_ciclo		; depois de abero vamos ler o ficheiro 
+
+M_erro_abrir:
+        mov     ah,09h
+        lea     dx,Erro_Open
+        int     21h
+        jmp     M_sai
+
+M_ler_ciclo:
+        mov     ah,3fh			; indica que vai ser lido um ficheiro 
+        mov     bx,HandleFich	; bx deve conter o Handle do ficheiro previamente aberto 
+        mov     cx,1			; numero de bytes a ler 
+        lea     dx,car_fich		; vai ler para o local de memoria apontado por dx (car_fich)
+        int     21h				; faz efectivamente a leitura
+	  jc	    M_erro_ler		; se carry é porque aconteceu um erro
+	  cmp	    ax,0			;EOF?	verifica se já estamos no fim do ficheiro 
+	  je	    M_fecha_ficheiro; se EOF fecha o ficheiro 
+        mov     ah,02h			; coloca o caracter no ecran
+	  mov	    dl,car_fich		; este é o caracter a enviar para o ecran
+	  int	    21h				; imprime no ecran
+	  jmp	    M_ler_ciclo		; continua a ler o ficheiro
+
+M_erro_ler:
+        mov     ah,09h
+        lea     dx,Erro_Ler_Msg
+        int     21h
+
+M_fecha_ficheiro:				; vamos fechar o ficheiro 
+        mov     ah,3eh
+        mov     bx,HandleFich
+        int     21h
+        jnc     M_sai
+
+        mov     ah,09h			; o ficheiro pode não fechar correctamente
+        lea     dx,Erro_Close
+        Int     21h
+M_sai:
+	ret
+        
+LOAD_MAZEGEN endp
+
+;------------------------------------------------------------------------
+; SELECT_DEFAULT - copia defaultMaze para selectedMaze
+;------------------------------------------------------------------------
+SELECT_DEFAULT proc
+	mov bx, 0 ;imaginar em C == i=0;
+CICLO:
+	mov al, defaultMaze[bx]
+	cmp al, 0
+	JE Sai		
+		mov selectedMaze[bx], al ;copia
+		inc BX 	;i++
+    JMP CICLO ;jump not equal
+ 
+    Sai:
+    	ret
+
+SELECT_DEFAULT endp
+
+
+;------------------------------------------------------------------------
+; SELECT_SAVED - copia savedMaze para selectedMaze
+;------------------------------------------------------------------------
+SELECT_SAVED proc
+	mov bx, 0 ;imaginar em C == i=0;
+CICLO:
+		mov al, savedMaze[bx]
+	cmp al, 0
+	JE Sai		
+		mov selectedMaze[bx], al ;copia
+		inc BX 	;i++
+    JMP CICLO ;jump not equal
+ 
+    Sai:
+    	ret
+
+SELECT_SAVED endp
+;------------------------------------------------------------------------
+
 ;------------------------------------------------------------------------
 ;								MAIN
 ;------------------------------------------------------------------------
@@ -1029,10 +1390,12 @@ jmp menu_0				; nao leu nenhuma das opçoes retorna ao inicio do menu
 ; MENU 1 - MENU DO JOGO
 ;-------------------------------------------------------------------------------
 menu_1:
+	call apaga_ecran
+	mov ah, 1 				;Load_MAZE tem input e output
 	call LOAD_MAZE
-	cmp al, 1
+	cmp al, 1				;Load_MAZE tem input e output
 	je c_erro
-	cmp al, 0
+	cmp al, 0				;Load_MAZE tem input e output
 	je s_erro
 		c_erro:
 		 goto_xy 0, 0
@@ -1060,14 +1423,30 @@ jmp menu_0
 ;-------------------------------------------------------------------------------
 menu_3:
 GOTO_XY 0,5
-
 		call	apaga_ecran
 		MOSTRA 	menu3_str
 
 		GOTO_XY 79,24
 		call 	LE_TECLA
 	voltar3_0: CMP 	AL, 49			; TECLA um
-	je menu_0
+	jne voltar3_1
+		je menu_0
+	voltar3_1: CMP 	AL, 50			; TECLA dois
+	jne voltar3_2
+	call SELECT_DEFAULT
+	jmp menu_3
+	voltar3_2: CMP 	AL, 51			; TECLA tres
+	jne voltar3_3
+	call SELECT_SAVED
+	jmp menu_3
+	voltar3_3: CMP 	AL, 52			; TECLA quatro
+		jne menu_3
+		call		apaga_ecran
+		call 		LOAD_MAZEGEN
+		mov ah, 0					;Load_MAZE tem input e output
+		call 		LOAD_MAZE
+		call 		CONFIG_MAZE
+	jmp menu_3
 jmp menu_3
 ;-------------------------------------------------------------------------------
 fim:

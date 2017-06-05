@@ -283,65 +283,435 @@ LE_TECLA	endp
 ; LOAD_SCORE - Carrega score Emma
 ;------------------------------------------------------------------------
 LOAD_SCORE PROC
+LOAD_SCORE PROC
+	call apaga_ecran
+	lea dx,top_scores
+	call LOAD_FILE
+INICIO:	
+		xor bx,bx
+		xor ax,ax
+	
 
-abre_ficheiro:
-		call	apaga_ecran
-		GOTO_XY	0,0
-		MOSTRA 	Volta_Menu
-		GOTO_XY 0,4
-        mov     ah,3dh			; vamos abrir ficheiro para leitura 
-        mov     al,0			; tipo de ficheiro	
-        lea     dx,Fich			; nome do ficheiro
-        int     21h				; abre para leitura 
-        jc      erro_abrir		; pode aconter erro a abrir o ficheiro 
-        mov     HandleFich,ax		; ax devolve o Handle para o ficheiro 
-        jmp     ler_ciclo		; depois de abero vamos ler o ficheiro 
+		mov     ah,3dh
+		mov     al,0
+		lea     dx,score
+		int     21h				; Chama a rotina de abertura de ficheiro (AX fica com Handle)
+		jc      erro_abrir
+		mov     HandleFich,ax
+		
+
+		jmp     ler_ciclo1
+
+
+
+
+ler_ciclo1:
+      	
+      	mov posx,35
+      	mov POSy,12
+tenta:	
+
+		le_car car_fich
+		cmp     car_fich,30h
+		jl 		tenta
+		cmp 	car_fich,39h
+		ja 		tenta
+
+
+		mov 	al,car_fich
+		mov 	STR12[0],al
+
+		le_car car_fich
+		mov 	al,car_fich
+		mov 	STR12[1],al
+		MOV 	STR12[2],'m'		
+		MOV 	STR12[3],':'
+
+		le_car car_fich
+		mov 	al,car_fich
+		MOV 	STR12[4],al
+
+		le_car car_fich
+		mov 	al,car_fich
+		MOV 	STR12[5],al
+		MOV 	STR12[6],'s'		
+		MOV 	STR12[7],'$'
+
+		goto_xy posx,posy
+		MOSTRA STR12
+		inc POSy
+
+		cmp 	POSy,23
+		jne		tenta
+		jmp 	fecha_ficheiro
+
+
+
+
+
 
 erro_abrir:
-        mov     ah,09h
-        lea     dx,Erro_Open
-        int     21h
-        jmp     termina_fich
-
-ler_ciclo:
-		mov     ah,3fh			; indica que vai ser lido um ficheiro 
-        mov     bx,HandleFich	; bx deve conter o Handle do ficheiro previamente aberto 
-        mov     cx,1			; numero de bytes a ler 
-        lea     dx,car_fich		; vai ler para o local de memoria apontado por dx (car_fich)
-        int     21h				; faz efectivamente a leitura
-	  	jc	    erro_ler		; se carry é porque aconteceu um erro
-	  	cmp	    ax,0			; EOF?	verifica se já estamos no fim do ficheiro 
-	  	je	    fecha_ficheiro	; se EOF fecha o ficheiro 
-        mov     ah,02h			; coloca o caracter no ecran
-	  	mov	    dl,car_fich		; este é o caracter a enviar para o ecran
-	  	int	    21h				; imprime no ecran
-	  	jmp	    ler_ciclo		; continua a ler o ficheiro
+		mov     ah,09h
+		lea     dx,Erro_Open
+		int     21h
+		jmp     FIM
 
 erro_ler:
-        mov     ah,09h
-        lea     dx,Erro_Ler_Msg
-        int     21h
+		mov     ah,09h
+		lea     dx,Erro_Ler_Msg
+		int     21h
+		jmp 	FIM
+	  
+	  
+fecha_ficheiro:
+	mov     ah,3eh
+	mov     bx,HandleFich
+	int     21h
+	jnc     FIM
 
-fecha_ficheiro:					; vamos fechar o ficheiro 
-        mov     ah,3eh
-        mov     bx,HandleFich
-        int     21h
-        jnc     termina_fich
+	mov     ah,09h
+	lea     dx,Erro_Close
+	Int     21h
+	jmp 	fim
 
-        mov     ah,09h			; o ficheiro pode não fechar correctamente
-        lea     dx,Erro_Close
-        Int     21h
 
-termina_fich:
+FIM:
 
-		call 	LE_TECLA
-		CMP 	AL, 53
-		JNE termina_fich
-		;ret
-
+	call LE_TECLA
+	CMP 		AL, 49		; Tecla 1
+	JNE		FIM
+	ret
 
 LOAD_SCORE endp
 
+;----------------------------------------------------------------------------
+;LE TEMPO
+;----------------------------------------------------------------------------
+ler_tempo proc
+	
+		PUSH AX
+		PUSH BX
+		PUSH CX
+		PUSH DX
+	
+		PUSHF
+
+		MOV AH, 2CH    ; Buscar a hORAS
+		INT 21H  
+
+		XOR AX,AX
+		MOV AL, DH         ; segundos para al
+		mov Segundos, ax   ; guarda segundos na variavel correspondente
+		
+		XOR AX,AX
+		MOV AL, CL         ; Minutos para al
+		mov Minutos, AX    ; guarda MINUTOS na variavel correspondente
+
+		POPF
+		POP DX
+		POP CX
+		POP BX
+		POP AX
+ 		RET 
+ler_tempo endp
+
+;------------------------------------------------------------------------------
+;TRATA DAS HORAS
+;------------------------------------------------------------------------------
+
+trata_horas proc
+			PUSHF
+			PUSH AX
+			PUSH BX
+			PUSH CX
+			PUSH DX	
+			CALL 	Ler_TEMPO
+	conta:	MOV		AX, Segundos
+			cmp		AX, Old_seg			; VErifica se os segundos mudaram desde a ultima leitura
+			je		fim_horas			; Se a hora não mudou desde a última leitura sai.
+			mov		Old_seg, AX			; Se segundos são diferentes actualiza informação do tempo 
+	
+	
+			inc Secs_de_jogo
+			CMP Secs_de_jogo, 60
+			JNE MOSTRA_SECS
+	
+			mov Secs_de_jogo,0
+			inc Minus_de_jogo
+	MOSTRA_SECS:	
+			mov AX, Minus_de_jogo
+			MOV 	bl, 10     
+			div 	bl
+			add 	al, 30h				; Caracter Correspondente às dezenas
+			add		ah,	30h				; Caracter Correspondente às unidades
+	
+			MOV 	STR12[0],al			 
+			MOV 	STR12[1],ah
+			MOV 	STR12[2],'m'		
+			MOV 	STR12[3],':'
+			;goto_xy	6,1
+			;MOSTRA	STR12 		
+	
+			mov 	ax,Secs_de_jogo
+			MOV 	bl, 10     
+			div 	bl
+			add 	al, 30h				; Caracter Correspondente às dezenas
+			add		ah,	30h				; Caracter Correspondente às unidades
+			MOV 	STR12[4],al			 
+			MOV 	STR12[5],ah
+			MOV 	STR12[6],'s'		
+			MOV 	STR12[7],'$'
+			goto_xy	34,23
+			MOSTRA	STR12 		
+	
+	
+	
+	fim_horas:		
+			goto_xy	POSx,POSy			; Volta a colocar o cursor onde estava antes de actualizar as horas
+			
+			POPF
+			POP DX		
+			POP CX
+			POP BX
+			POP AX
+			RET				
+trata_horas endp
+
+;----------------------------------------------------------------------
+; GUARDA O TEMPO
+;----------------------------------------------------------------------
+
+save_score 	PROC
+		mov bx,0
+		mov al,STR12[bx] 		;Str12->'01m:25s'
+		mov tempo[bx],al		;tempo->'0125'
+
+		inc bx
+		mov al,STR12[bx]
+		mov tempo[bx],al
+
+		mov bx,4
+		mov al,STR12[bx]
+		mov bx,2
+		mov tempo[bx],al
+
+		mov bx,5
+		mov al,STR12[bx]
+		mov bx,3
+		mov tempo[bx],al
+
+		INICIO:	
+				xor cx,cx
+				xor si,si
+				xor bx,bx
+				xor ax,ax
+	
+
+				mov     ah,3dh
+				mov     al,0
+				lea     dx,score
+				int     21h				; Chama a rotina de abertura de ficheiro (AX fica com Handle)
+				jc      erro_abrir
+				mov     HandleFich,ax
+		
+
+				xor	    si,si			; indice da matriz inicia a zero
+				jmp     ler_ciclo1
+		ler_ciclo1:
+      			lea 	si,matriz   
+		linha:
+      		tenta:	
+				le_car  car_fich
+				cmp     car_fich,30h    ;compara se ta a baixo do 0
+				jl 		tenta
+				cmp 	car_fich,39h    ;compara se ta acima do 9
+				ja 		tenta
+
+				mov 	bx,0				;1º algarismo da 1º coluna
+				mov 	al,car_fich
+				mov 	matriz[si][bx],AL 	;meter numero
+				le_car car_fich
+
+				mov 	bx,1				;2 algarismo da coluna
+				mov 	al,car_fich
+				mov 	matriz[si][bx],AL 	;meter numero
+				le_car car_fich
+
+				mov 	bx,2				;1 algarismo da 2  coluna
+				mov 	al,car_fich
+				mov 	matriz[si][bx],AL 	;meter numero
+				le_car car_fich
+
+				mov 	bx,3				;2 algarismo da 2 coluna
+				mov 	al,car_fich
+				mov 	matriz[si][bx],AL 	;meter numero
+
+				add 	si,4				;anda na linha
+				cmp 	si,40				;ve se esta no maximo
+				jne		tenta
+				jmp 	fecha_ficheiro
+
+		erro_abrir:
+				mov     ah,09h
+				lea     dx,Erro_Open
+				int     21h
+				jmp     sai
+
+		erro_ler:
+				mov     ah,09h
+				lea     dx,Erro_Ler_Msg
+				int     21h
+				jmp 	sai
+	  
+	  
+		fecha_ficheiro:
+			mov     ah,3eh
+			mov     bx,HandleFich
+			int     21h
+			jnc     comparacao
+
+			mov     ah,09h
+			lea     dx,Erro_Close
+			Int     21h
+			jmp 	fim
+		
+		troca:
+			mov bx,0
+			mov al,matriz[si][bx]	;tira o primeiro algarismo da matriz
+			mov tempo_aux[bx],al 	; mete-o na variavel auxiliar
+			mov al,tempo[bx]		;tira o primeiro algarismo de tempo
+			mov matriz[si][bx],al 	;mete-o na matriz
+			mov al, tempo_aux[bx]	;tira o primeiro alrismo da variavel auxiliar
+			mov tempo[bx],al 		;mete-o na variavel aux
+			
+			inc bx
+			mov al,matriz[si][bx]	;tira o segundo algarismo da matriz
+			mov tempo_aux[bx],al 	; mete-o na variavel auxiliar
+			mov al,tempo[bx]		;tira o segundo algarismo de tempo
+			mov matriz[si][bx],al 	;mete-o na matriz
+			mov al, tempo_aux[bx]	;tira o segundo alrismo da variavel auxiliar
+			mov tempo[bx],al 		;mete-o na variavel aux
+			
+			inc bx
+			mov al,matriz[si][bx]	;tira o treceiro algarismo da matriz
+			mov tempo_aux[bx],al 	; mete-o na variavel auxiliar
+			mov al,tempo[bx]		;tira o treceiro algarismo de tempo
+			mov matriz[si][bx],al 	;mete-o na matriz
+			mov al, tempo_aux[bx]	;tira o treceiro alrismo da variavel auxiliar
+			mov tempo[bx],al 		;mete-o na variavel aux
+			
+			inc bx
+			mov al,matriz[si][bx]	;tira o quarto algarismo da matriz
+			mov tempo_aux[bx],al 	; mete-o na variavel auxiliar
+			mov al,tempo[bx]		;tira o quarto algarismo de tempo
+			mov matriz[si][bx],al 	;mete-o na matriz
+			mov al, tempo_aux[bx]	;tira o quarto alrismo da variavel auxiliar
+			mov tempo[bx],al 		;mete-o na variavel aux
+			jmp comparacao
+	
+		comparacao:
+			mov 	si,0
+		 aqui:	
+		 	mov 	bx,0				;temos o tempo assim: 0000 (em hexadecimal)
+		 	mov     al,tempo[bx]
+		 	cmp 	matriz[si][bx],al 	;compara [0]0000
+		 	ja 		troca
+		 	cmp 	matriz[si][bx],al
+		 	jl 		continua
+		
+		 	inc 	bx
+		 	mov     al,tempo[bx]
+		 	cmp 	matriz[si][bx],al 	;compara 0[0]00
+		 	ja 		troca
+		 	cmp 	matriz[si][bx],al
+		 	jl 		continua
+		
+		 	inc 	bx
+		 	mov     al,tempo[bx]
+		 	cmp 	matriz[si][bx],al	;compara 00[0]0
+		 	ja 		troca
+		 	cmp 	matriz[si][bx],al
+		 	jl 		continua
+		
+		 	inc 	bx
+		 	mov     al,tempo[bx]
+		 	cmp 	matriz[si][bx],al 	;compara 000[0]
+		 	ja 		troca
+		 	cmp 	matriz[si][bx],al
+		 	jl 		continua
+		continua:
+		 	add 	si,4
+		 	cmp 	si,40								
+			jne		aqui
+		
+		sai:
+				mov		ah, 3ch				; Abrir o ficheiro para escrita
+				mov		cx, 00H				; Define o tipo de ficheiro ??
+				lea		dx, score			; DX aponta para o nome do ficheiro 
+				int		21h					; Abre efectivamente o ficheiro (AX fica com o Handle do ficheiro)
+				mov 	HandleFich,ax
+				jnc		comeca_save			; Se não existir erro escreve no ficheiro
+			
+				jmp		fim
+		
+
+		comeca_save:
+		
+				mov 	si,0
+		novalinha:
+					;escreve o 1 caracter da 1 caluna
+				mov 	bx,0
+				mov 	al,matriz[si][bx]
+				mov 	char,al 				
+				escreve_car	
+					;escreve o 2 caracter da 1 caluna
+				mov 	bx,1
+				mov 	al,matriz[si][bx]
+				mov 	char,al 				
+				escreve_car	
+					;escreve o 1 caracter da 2 caluna
+				mov 	bx,2
+				mov 	al,matriz[si][bx]
+				mov 	char,al 				
+				escreve_car
+					;escreve o 2 caracter da 2 caluna
+				mov 	bx,3
+				mov 	al,matriz[si][bx]
+				mov 	char,al 				
+				escreve_car
+					;escrever mudanca de linha
+				MOV 	char,13  
+				mov 	bx,	HandleFich			
+				mov		ah, 40h				
+				lea		dx, Char
+				mov 	cx,	1	
+				int		21H
+		
+				MOV 	char,10  
+				mov 	bx,	HandleFich			
+				mov		ah, 40h				
+				lea		dx, Char
+				mov 	cx,	1	
+				int		21H
+		
+				add si, 4
+				cmp si,40
+				jne novalinha
+					;fecha_ficheiro
+				mov bx,HandleFich	        	
+				mov	ah,3eh			; indica que vamos fechar
+				int	21h				; fecha mesmo
+				jnc	FIM				; se não acontecer erro termina
+			
+		
+				mov	ah, 09h
+				lea	dx, Erro_Close
+				int	21h
+		
+		FIM:
+			ret
+
+save_score endp
 ;------------------------------------------------------------------------
 ; LOAD_SCREEN - imprime o ficheiro game_screen
 ;------------------------------------------------------------------------
@@ -543,10 +913,41 @@ return:
 	RET 
 LOAD_MAZE endp
 
+;-------------------------------------------------------------------------
+;LE TECLA SO PARA O JOGO
+;-------------------------------------------------------------------------
+
+LE_TECLA_JOGO	PROC
+sem_tecla:
+		call trata_horas
+		MOV	AH,0BH
+		INT 21h
+		cmp AL,0
+		je	sem_tecla
+		
+		goto_xy	POSx,POSy
+		
+		MOV	AH,08H
+		INT	21H
+		MOV	AH,0
+		CMP	AL,0
+		JNE	SAI_TECLA
+		MOV	AH, 08H
+		INT	21H
+		MOV	AH,1
+SAI_TECLA:	
+		RET
+LE_TECLA_JOGO	ENDP
+
+
 ;------------------------------------------------------------------------
 ; JOGO
 ;------------------------------------------------------------------------
 JOGO PROC
+
+	mov Secs_de_jogo,0
+	mov Minus_de_jogo,0 
+
 	mov ah, pos_Ix
 	mov POSx, ah
 	sub Posx, 1				;Esta linha é ilusao professor, ignore :)
@@ -571,8 +972,8 @@ CICLO:	goto_xy	POSx,POSy	; Vai para nova possição
 
 		cmp char,219		;Detetou parede!
 		JE volta 			;Logo volta a Pos anterior
-		cmp char,176
-		jE  fim 
+		cmp char,176		; DETETOU O FIM
+		jE  ENCONTROU 		; vai para encontrou 
 		cmp POSx, 40		;Passou o limite do mapa X > 40 ....yeah I know
 		ja volta 			;Logo volta a Pos anterior
 		cmp POSy, 19 		;Passou o limite do mapa Y > 19
@@ -593,7 +994,7 @@ IMPRIME:
 		mov		al, POSy	; Guarda a posição do cursor
 		mov 	POSya, al
 		
-LER_SETA:	call 		LE_TECLA
+LER_SETA:	call 		LE_TECLA_JOGO
 		cmp		ah, 1
 		je		ESTEND
 		CMP 	AL, 27	; ESCAPE
@@ -627,10 +1028,33 @@ Volta: 						;retorna a pos Anterior
 		mov al, POSxa
 		mov	POSx,al
 		jmp LER_SETA
+
+ENCONTROU:
+		call ganhou
 fim:	
 		ret
 
 JOGO endp
+
+;--------------------------------------------------------------------------
+; ENCONTROU
+;--------------------------------------------------------------------------
+
+ganhou PROC
+		Call 	apaga_ecran
+		GOTO_XY 0,5
+		MOSTRA  ganhou_str
+		goto_xy	40,13
+		MOSTRA	STR12
+		Call 	LE_TECLA
+		goto_xy	80,25
+		call save_score
+		call Main
+
+			
+		mov     ah,4ch
+        int     21h	
+ganhou endp
 
 ;------------------------------------------------------------------------
 ; CONFIG_MAZE
