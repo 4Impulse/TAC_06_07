@@ -1261,6 +1261,21 @@ ganhou PROC
         int     21h	
 ganhou endp
 
+ganhou_bonus PROC
+		
+		Call 	apaga_ecran
+		GOTO_XY 0,5
+		MOSTRA  ganhou_str
+ciclo:	call LE_TECLA
+		cmp al, 32
+		jne ciclo
+		call Main
+
+			
+		mov     ah,4ch
+        int     21h	
+ganhou_bonus endp
+
 ;------------------------------------------------------------------------
 ; CONFIG_MAZE
 ;------------------------------------------------------------------------
@@ -1822,7 +1837,7 @@ ciclo_pass:
 
 								jmp ciclo_pass
 						ENCONTROU:
-								call ganhou
+								call ganhou_bonus
 
 
 ;**** FIM MOVIMENTOS		
