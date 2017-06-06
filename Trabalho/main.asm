@@ -35,6 +35,34 @@ INT 21H
 ENDM
 ;------------------------------------------------------------------------
 
+;------------------------------------------------------------------------
+;	Le caracter pretendido
+;------------------------------------------------------------------------
+le_car macro car_fich
+		mov     ah, 3fh
+     	mov     bx, HandleFich
+     	mov     cx, 1				; vai ler apenas um byte de cada vez
+     	lea     dx, car_fich		; DX fica a apontar para o caracter lido
+      	int     21h					; lê um caracter do ficheiro
+		jc		erro_ler
+
+		cmp		ax, 0				; verifica se já chegou o fim de ficheiro EOF? 
+		je		fecha_ficheiro		; se chegou ao fim do ficheiro fecha e sai
+
+
+endm
+
+;-------------------------------------------------------------------------
+;	IMPRIME O CRACTER
+;-------------------------------------------------------------------------
+escreve_car macro
+ 		mov 	bx,	HandleFich			
+		mov		ah, 40h				
+		lea		dx, Char
+		mov 	cx,	1	
+		int		21H	
+endm
+
 
 ;------------------------------------------------------------------------
 ; SAVE_MAZE - Guarda as primeiras 40x20 celulas do ecra no ficheiro STR
@@ -148,14 +176,21 @@ ENDM
 
 dseg   	segment para public 'data'
 
-	;				VARIAVEIS PARA O RELOGIO E DATA
-	;------------------------------------------------------------------------
-	STR12	 		DB 		"            "				; String para 12 digitos	
-	NUMERO			DB		"                    $" 	; String destinada a guardar o número lido
-	NUMDIG			db		0							; controla o numero de digitos do numero lido
-	MAXDIG			db		1							; Constante que define o numero MAXIMO de digitos a ser aceite					
-	NUM_SP			db		"                    $" 	; PAra apagar zona de ecran
+	;------------------------------------------------------------------------	
+	matriz 			db 	10 dup(4 dup(0))
+    tempo     		db  '0066'		
+	tempo_aux 		db  '    '	
+    top_scores  	db  'topmenu.txt$',0
+    score 			db 	'TOP10.txt$',0
+    Minutos			dw		0	; Vai guardar os minutos actuais
+	Segundos		dw		0	; Vai guardar os segundos actuais
+	Old_seg			dw		0	; Guarda os últimos segundos que foram lidos
+	STR12			DB 		"            "	; String para o tempo
 	
+	Minus_de_jogo 	dw 		0	; vai ter os minutso que passaram desque iniciou o jogo
+	Secs_de_jogo 	dw 		0	; vai ter os secs que passaram desque inicio o jogo
+
+
 	;				ESCREVER FICHEIRO / LER FICHEIRO
 	;------------------------------------------------------------------------
 	Erro_Open       db      'Erro ao tentar abrir o ficheiro$'
@@ -170,6 +205,12 @@ dseg   	segment para public 'data'
     Erro_Campo		db		'Campo com formato incorrecto$'
     game_screen     db      'ecra.TXT$',0
     HandleFile      dw      0
+    POStrY			db		3	; a linha pode ir de [1 .. 25]
+	POStrX			db		17	; POStrX pode ir [1..80]	
+    nome			db 		'      ',0					;STR com o nome do jogador
+    NUMDIG			db			0	; controla o numero de digitos do numero lido
+	MAXDIG			db			3	; Constante que define o numero MAXIMO de digitos a ser aceite
+	ASK_STR			db 		'Insira o seu nome: $',0
 
     ; 				Ficheiros Top10
     Fich         	db      'TOP10.txt$',0
@@ -182,6 +223,20 @@ dseg   	segment para public 'data'
 
     ;				MOSTRAR PARA VOLTAR AO MENU
     Volta_Menu		db 		'Para voltar ao menu Prima "5" $',0
+
+    ; 							BONUS
+    bonus_input 	db 		'Sequencia HEX 	(3digitos)$',0
+    str_bonus		db 		'000$',0						;Sequencia~HEXA jogador
+    dir_passos		db		'0000$',0
+    n_dir 			db 		0
+	n_pass 		    db 		0
+	pass_dados		db 		0
+	contaCiclo 		db 		0
+	str_cls 		db 		'         $',0
+	PosBonusX 		db 		0
+	PosBonusY 		db 		0
+	PosBonusXa 		db 		0
+	PosBonusYa		db 		0
 
     ;				VARIAVEIS PARA O LABIRINTO E AVATAR
     ;------------------------------------------------------------------------
@@ -218,6 +273,7 @@ dseg   	segment para public 'data'
 					db	'                                2. TOP 10                                      ',13,10
 					db	'                                3. Configurar labirinto                        ',13,10
 					db	'                                4. Sair                                        ',13,10
+					db	'                                5. BONUS                                       ',13,10
 					db	'+-----------------------------------------------------------------------------+',13,10
 					db	'                                                                               ',13,10
 					db  '$'
@@ -237,6 +293,20 @@ dseg   	segment para public 'data'
 					db	'+-----------------------------------------------------------------------------+',13,10
 					db	'                                                                               ',13,10
 					db  '$'
+
+	ganhou_str		db '                      _____             _                 _                ',13,10
+					db '                     |  __ \           | |               | |               ',13,10
+					db '                     | |  \/ __ _ _ __ | |__   ___  _   _| |               ',13,10
+					db '                     | | __ / _` |  _ \|  _ \ / _ \| | | | |               ',13,10
+					db '                     | |_\ \ (_| | | | | | | | (_) | |_| |_|               ',13,10
+					db '                      \____/\__,_|_| |_|_| |_|\___/ \__,_(_)               ',13,10
+					db	'+-----------------------------------------------------------------------------+',13,10
+					db	'                                                                               ',13,10	
+					db	'                      Tempo decorrido:                                         ',13,10
+					db	'                                                                               ',13,10
+					db	'                                                                               ',13,10
+					db	'+-----------------------------------------------------------------------------+',13,10
+					db '$'
 
 
 dseg    	ends
@@ -280,9 +350,138 @@ SAI_TECLA:	RET
 LE_TECLA	endp
 
 ;------------------------------------------------------------------------
+; le_string - Le uma String de tamanho NUMDIG, e insere em NUMDIG+1 o char $
+;				(String nome)
+;------------------------------------------------------------------------
+le_string  proc
+		mov		NUMDIG, 0			; inícia leitura de novo número
+		mov		cx, 5			
+		XOR		BX,BX
+
+LIMPA_N: 							;caso a gente queira voltar a usar
+		mov		nome[bx], ' '	
+		inc		bx
+		loop 	LIMPA_N
+
+		xor cx,cx
+		mov POStrX, 41
+		mov POStrY, 14
+CICLO:	goto_xy POStrX, POStrY
+		
+
+		call 	LE_TECLA		; lê uma nova tecla
+		cmp		ah,1			; verifica se é tecla extendida
+		je		ESTEND
+		CMP 	AL,27			; caso seja tecla ESCAPE sai do programa
+		JE		fim
+		
+		CMP 	AL,13			; Pressionando ENTER vai para OKNUM
+		JE		OKNUM		
+		
+		CMP 	AL,8			; Teste BACK SPACE <- (apagar digito)
+		JNE		NOBACK
+		
+		mov		bl,NUMDIG		; Se Pressionou BACK SPACE 
+		CMP		bl,0			; Verifica se não tem digitos no numero
+		JE		NOBACK			; se não tem digitos continua então não apaga e salta para NOBACK
+
+		dec		NUMDIG			; Retira um digito (BACK SPACE)
+		dec		POStrX			; Retira um digito	
+
+		dec 	bx
+		mov		bl, NUMDIG
+		mov		nome[bx],' '	; Retira um digito		
+		goto_xy	POStrX,POStrY
+		mov 	al, ' '
+		mov		ah,02h			; imprime digito 
+		mov		dl,al			; na possicão do cursor
+		int		21H
+		jmp 	CICLO
+NOBACK:	
+		
+		mov		bl,MAXDIG		; se atigido numero máximo de digitos ?	
+		CMP		bl,NUMDIG	
+		jbe		CICLO			; não aceita mais digitos
+		xor		Bx, Bx			; caso contrario coloca digito na matriz nome
+		mov		bl, NUMDIG
+		MOV		nome[bx], al		
+		mov		ah,02h			; imprime digito 
+		mov		dl,al			; na possicão do cursor
+		int		21H
+
+		inc		POStrX			; avança o cursor e
+		inc		NUMDIG			; incrementa o numero de digitos
+
+ESTEND:	jmp	CICLO			
+
+OKNUM:		
+		mov		bl, NUMDIG
+		MOV 	nome[bx], '$'
+		inc 	bl			 
+fim:	ret
+
+le_string ENDP
+
+;------------------------------------------------------------------------
+;	CARREGA FICHEIRO
+;------------------------------------------------------------------------
+
+LOAD_FILE PROC
+        mov     ah,3dh                  ; vamos abrir ficheiro para leitura 
+        mov     al,0                    ; tipo de ficheiro      
+        int     21h                     ; abre para leitura 
+        jc      erro_abrir              ; pode aconter erro a abrir o ficheiro 
+        mov     HandleFich,ax           ; ax devolve o Handle para o ficheiro 
+        jmp     ler_ciclo               ; depois de abero vamos ler o ficheiro 
+
+erro_abrir:
+        mov     ah,09h
+        lea     dx,Erro_Open
+        int     21h
+        jmp     FIM
+
+ler_ciclo:
+        mov     ah,3fh                  ; indica que vai ser lido um ficheiro 
+        mov     bx,HandleFich           ; bx deve conter o Handle do ficheiro previamente aberto 
+        mov     cx,1                    ; numero de bytes a ler 
+        lea     dx,car_fich             ; vai ler para o local de memoria apontado por dx (car_fich)
+        int     21h                             ; faz efectivamente a leitura
+        jc        erro_ler            ; se carry é porque aconteceu um erro
+        cmp       ax,0                        ;EOF?   verifica se já estamos no fim do ficheiro 
+        je        fecha_ficheiro      ; se EOF fecha o ficheiro 
+        mov     ah,02h					; coloca o caracter no ecran
+        cmp     car_fich, '#'
+        je		troca
+
+continua:       
+		mov       dl,car_fich         ; este é o caracter a enviar para o ecran
+        int       21h                         ; imprime no ecran
+        jmp       ler_ciclo           ; continua a ler o ficheiro
+troca:	
+		mov car_fich, 219
+		jmp continua
+erro_ler:
+        mov     ah,09h
+        lea     dx,Erro_Ler_Msg
+        int     21h
+
+fecha_ficheiro:                                 ; vamos fechar o ficheiro 
+        mov     ah,3eh
+        mov     bx,HandleFich
+        int     21h
+        jnc     FIM
+
+        mov     ah,09h                  ; o ficheiro pode não fechar correctamente
+        lea     dx,Erro_Close
+        Int     21h
+FIM:    
+        ret 
+LOAD_FILE endp
+
+;------------------------------------------------------------------------
 ; LOAD_SCORE - Carrega score Emma
 ;------------------------------------------------------------------------
-LOAD_SCORE PROC
+
 LOAD_SCORE PROC
 	call apaga_ecran
 	lea dx,top_scores
@@ -769,7 +968,6 @@ LOAD_SCREEN endp
 ;									Return (AH=0) Ok (AH=1) ERRO
 ;------------------------------------------------------------------------
 LOAD_MAZE PROC
-	
 	cmp ah, 1
 	jne inicio
 	call LOAD_SCREEN
@@ -962,6 +1160,10 @@ JOGO PROC
 	mov		char, al		; Guarda o Caracter que está na posição do Cursor
 	mov		Cor, ah			; Guarda a cor que está na posição do Cursor		
 	
+	goto_xy	POSx,POSy	; Vai para posição do cursor
+								mov		ah, 02h
+								mov		dl, 254		; Coloca AVATAR
+								int		21H	
 
 CICLO:	goto_xy	POSx,POSy	; Vai para nova possição
 		mov 	ah, 08h
@@ -978,6 +1180,10 @@ CICLO:	goto_xy	POSx,POSy	; Vai para nova possição
 		ja volta 			;Logo volta a Pos anterior
 		cmp POSy, 19 		;Passou o limite do mapa Y > 19
 		ja volta	 		;Logo volta a Pos anterior
+		cmp POSx, 0		;Passou o limite do mapa X > 40 ....yeah I know
+		jb volta 			;Logo volta a Pos anterior
+		cmp POSy, 0 		;Passou o limite do mapa Y > 19
+		jb volta
 	
 IMPRIME:	
 		goto_xy	POSx,POSy	; Vai para posição do cursor
@@ -1041,12 +1247,15 @@ JOGO endp
 ;--------------------------------------------------------------------------
 
 ganhou PROC
+		
 		Call 	apaga_ecran
 		GOTO_XY 0,5
 		MOSTRA  ganhou_str
-		goto_xy	40,13
+		goto_xy	41,13
 		MOSTRA	STR12
-		Call 	LE_TECLA
+		goto_xy	22,14
+		MOSTRA 	ASK_STR
+		call le_string
 		goto_xy	80,25
 		call save_score
 		call Main
@@ -1242,6 +1451,398 @@ SELECT_SAVED endp
 ;------------------------------------------------------------------------
 
 ;------------------------------------------------------------------------
+; Clear_BONUS 
+;------------------------------------------------------------------------
+Clear_BONUS proc
+	mov bx, 0 ;imaginar em C == i=0;
+CICLO:
+		mov al, str_cls[bx]
+	cmp al, 0
+	JE Sai		
+		mov str_bonus[bx], al ;copia
+		inc BX 	;i++
+    JMP CICLO ;jump not equal
+ 
+    Sai:
+    	ret
+
+Clear_BONUS endp
+;------------------------------------------------------------------------
+
+;------------------------------------------------------------------------
+; BONUS
+;------------------------------------------------------------------------
+BONUS PROC
+	
+	goto_xy 	44, 14
+	MOSTRA  	bonus_input
+
+	mov ah, pos_Ix
+	mov PosBonusX, ah
+	sub PosBonusX, 1				;Esta linha é ilusao professor, ignore :)
+
+	mov ah, pos_Iy
+	mov PosBonusY, ah
+
+	mov ah, PosBonusX
+	mov PosBonusXa, ah
+
+	mov ah, pos_Iy
+	mov PosBonusYa, ah
+
+
+	goto_xy	PosBonusX,PosBonusY		; Vai para nova possição
+	mov 	ah, 08h			; Guarda o Caracter que está na posição do Cursor
+	mov		bh,0			; numero da página
+	int		10h			
+	mov		char, al		; Guarda o Caracter que está na posição do Cursor
+	mov		Cor, ah			; Guarda a cor que está na posição do Cursor		
+	
+	goto_xy	PosBonusX,PosBonusy	; Vai para posição do cursor
+								mov		ah, 02h
+								mov		dl, 254		; Coloca AVATAR
+								int		21H	
+
+ciclo:	
+	call Clear_BONUS
+	call le_bonus
+	cmp al, 27
+	je fim
+	call trata_hex
+	jmp ciclo
+	
+
+fim:	
+		ret
+
+BONUS endp
+
+
+;------------------------------------------------------------------------
+; le_bonus
+;------------------------------------------------------------------------
+
+le_bonus  proc
+		mov		NUMDIG, 0			; inícia leitura de novo número
+		mov		cx, 5			
+		XOR		BX,BX
+
+
+		xor cx,cx
+		mov POStrX, 57
+		mov POStrY, 17
+		goto_xy POStrX, POStrY
+		MOSTRA str_cls
+CICLO:	goto_xy POStrX, POStrY
+		
+
+		call 	LE_TECLA		; lê uma nova tecla
+		cmp		ah,1			; verifica se é tecla extendida
+		je		ESTEND
+		CMP 	AL,27			; caso seja tecla ESCAPE sai do programa
+		JE		fim
+		cmp 	al, 'f'
+		ja 		ciclo
+		
+		CMP 	AL,13			; Pressionando ENTER vai para OKNUM
+		JE		OKNUM		
+		
+		CMP 	AL,8			; Teste BACK SPACE <- (apagar digito)
+		JNE		NOBACK
+		
+		mov		bl,NUMDIG		; Se Pressionou BACK SPACE 
+		CMP		bl,0			; Verifica se não tem digitos no numero
+		JE		NOBACK			; se não tem digitos continua então não apaga e salta para NOBACK
+
+		dec		NUMDIG			; Retira um digito (BACK SPACE)
+		dec		POStrX			; Retira um digito	
+
+		dec 	bx
+		mov		bl, NUMDIG
+		mov		str_bonus[bx],' '	; Retira um digito		
+		goto_xy	POStrX,POStrY
+		mov 	al, ' '
+		mov		ah,02h			; imprime digito 
+		mov		dl,al			; na possicão do cursor
+		int		21H
+		jmp 	CICLO
+NOBACK:	
+		
+		mov		bl,MAXDIG		; se atigido numero máximo de digitos ?	
+		CMP		bl,NUMDIG	
+		jbe		CICLO			; não aceita mais digitos
+		xor		Bx, Bx			; caso contrario coloca digito na matriz nome
+		mov		bl, NUMDIG
+		MOV		str_bonus[bx], al		
+		mov		ah,02h			; imprime digito 
+		mov		dl,al			; na possicão do cursor
+		int		21H
+
+		inc		POStrX			; avança o cursor e
+		inc		NUMDIG			; incrementa o numero de digitos
+
+ESTEND:	
+		jmp	CICLO			
+
+OKNUM:	
+		mov		bl,MAXDIG		; se atigido numero máximo de digitos ?	
+		CMP		bl,NUMDIG
+		jne		CICLO
+			 
+fim:	
+		ret
+
+le_bonus ENDP
+
+converter  proc
+
+number: 
+		cmp al, '0'
+		jb exit
+		cmp al, '9'
+		ja uppercase
+		sub al, 30h
+		call process
+		jmp exit
+
+uppercase: 	
+			cmp al, 'A'
+	   		 jb exit
+		    cmp al, 'F'
+			ja lowercase
+			sub al, 37h
+			call process
+			jmp exit
+
+lowercase: 	
+			cmp al, 'a'
+			jb exit
+			cmp al, 'f'
+			ja exit
+			sub al, 57h
+			call process
+			jmp exit
+
+			
+
+process: 	
+			mov ch, 4
+			mov cl, 3
+			mov bl, al
+			mov SI, 0
+
+convert:	
+			mov al, bl
+			ror al, cl
+			and al, 01
+			add al, 30h
+
+			;GOTO_XY 0, 22
+
+			mov dir_passos[SI], al
+			inc SI
+			;mov ah, 02h
+			;mov dl, al
+			;int 21h
+
+			dec cl
+			dec ch
+			jnz convert
+
+			mov dl, 20h
+			int 21h
+
+exit:		
+			ret
+converter endp
+;---------------------------------------
+trata_hex proc
+		mov ax,0
+		mov bx,0
+		mov cx,0
+		mov dx,0
+		GOTO_XY 0, 0
+		;MOSTRA str_bonus
+		mov dh,0
+		mov BP, 0
+		mov contaCiclo, 0			
+looping:
+		mov al, str_bonus[BP]
+
+		
+		call converter
+		;MOSTRA string
+
+
+		mov al, dir_passos[0] 
+		sub al, 30h
+		MOV bl, 10
+		mul bl
+
+		mov n_dir, al
+
+		mov al, dir_passos[1] 
+		sub al, 30h
+
+		
+		add n_dir, al
+		
+		cmp n_dir, 00
+		jne d_um1
+		jmp passos
+
+d_um1:	
+		cmp n_dir, 01
+		jne d_dez1
+		jmp passos
+
+d_dez1:	
+		cmp n_dir, 10
+		jne d_onze1
+		jmp passos
+
+d_onze1:	
+		cmp n_dir, 11
+		jne fim
+
+
+
+passos:	
+		mov al, dir_passos[2] 
+		sub al, 30h
+		MOV bl, 10
+		mul bl
+
+		mov n_pass, al
+
+		mov al, dir_passos[3] 
+		sub al, 30h
+
+		
+		add n_pass, al
+		
+		inc POSy
+		goto_xy 0,POSy
+		
+		cmp n_pass, 0
+		jne p_um1
+		mov n_pass, 1
+		jmp ciclo_pass
+
+p_um1:	
+		cmp n_pass, 1
+		jne p_dez1
+		mov n_pass, 2
+		jmp ciclo_pass
+
+p_dez1:	
+		cmp n_pass, 10
+		jne p_onze1
+		mov n_pass, 3
+		jmp ciclo_pass
+
+p_onze1:	
+		cmp n_pass, 11
+		jne fim
+		mov n_pass, 4
+
+;------MOVIMENTOS	
+		mov pass_dados, 0
+ciclo_pass:
+			
+			inc pass_dados
+			mov al, pass_dados
+			cmp n_pass, al
+			je cont
+			
+	ciclo_dir:
+					cmp n_dir, 00
+					jne dir_sul
+					dec		PosBonusY
+					jmp ciclo_movi
+		dir_sul:	
+					cmp n_dir, 01
+					jne dir_este
+					inc 	PosBonusY
+					jmp ciclo_movi
+		dir_este:	
+					cmp n_dir, 10
+					jne dir_oeste
+					inc 	PosBonusX
+					jmp ciclo_movi
+		dir_oeste:	
+					cmp n_dir, 11
+					jne cont
+					dec 	PosBonusX
+
+				ciclo_movi:
+						;inc pass_dados
+						CICLO:	
+								goto_xy	PosBonusX,PosBonusy	; Vai para nova possição
+								mov 	ah, 08h
+								mov		bh,0		; numero da página
+								int		10h		
+								mov		char, al	; Guarda o Caracter que está na posição do Cursor
+								mov		Cor, ah		; Guarda a cor que está na posição do Cursor
+
+								cmp char,219		;Detetou parede!
+								JE volta 			;Logo volta a Pos anterior
+								cmp char,176		; DETETOU O FIM
+								jE  ENCONTROU 		; vai para encontrou 
+								cmp PosBonusX, 40	;Passou o limite do mapa X > 40 ....yeah I know
+								ja volta 			;Logo volta a Pos anterior
+								cmp PosBonusy, 19 	;Passou o limite do mapa Y > 19
+								ja volta	 		;Logo volta a Pos anterior
+								cmp PosBonusX, 0	;Passou o limite do mapa X > 40 ....yeah I know
+								jb volta 
+								cmp PosBonusX, 0	;Passou o limite do mapa X > 40 ....yeah I know
+								jb volta 
+
+						IMPRIME:	
+								goto_xy	PosBonusX,PosBonusy	; Vai para posição do cursor
+								mov		ah, 02h
+								mov		dl, 254		; Coloca AVATAR
+								int		21H	
+								goto_xy	PosBonusXa,PosBonusYa	; Vai para a posição anterior do cursor
+								mov		ah, 02h
+								mov		dl, char	; Repoe Caracter guardado 
+								int		21H	
+								goto_xy	PosBonusX,PosBonusY	; Vai para posição do cursor
+								mov		al, PosBonusX	; Guarda a posição do cursor
+								mov		PosBonusXa, al
+								mov		al, PosBonusY	; Guarda a posição do cursor
+								mov 	PosBonusYa, al
+						Volta: 						;retorna a pos Anterior
+								mov al,PosBonusYa
+								mov PosBonusY,al
+								mov al, PosBonusXa
+								mov	PosBonusX,al
+								jmp ciclo_pass
+						ENCONTROU:
+								call ganhou
+
+
+;**** FIM MOVIMENTOS		
+cont:
+		inc contaCiclo
+		mov dh, contaCiclo
+		cmp dh, 3
+		je fim
+
+
+		inc BP
+		inc POSy
+		inc POSy
+		
+
+		jmp looping
+fim:
+		ret
+
+trata_hex endp
+
+
+;------------------------------------------------------------------------
 ;								MAIN
 ;------------------------------------------------------------------------
 
@@ -1274,6 +1875,9 @@ tres: 	CMP 	AL, 51		; TECLA tres
 
 quatro: CMP 	AL, 52		; TECLA quatro
 		JE		FIM
+
+cinco: 	CMP 	AL, 53		; TECLA cinco
+		JE		menu_4
 
 jmp menu_0				; nao leu nenhuma das opçoes retorna ao inicio do menu
 ;-------------------------------------------------------------------------------
@@ -1341,6 +1945,31 @@ GOTO_XY 0,5
 	jmp menu_3
 jmp menu_3
 ;-------------------------------------------------------------------------------
+
+;-------------------------------------------------------------------------------
+; MENU 4 - MENU DO BONU
+;-------------------------------------------------------------------------------
+menu_4:
+	call apaga_ecran
+	mov ah, 1 				;Load_MAZE tem input e output
+	call LOAD_MAZE
+	cmp al, 1				;Load_MAZE tem input e output
+	je c_erro4
+	cmp al, 0				;Load_MAZE tem input e output
+	je s_erro4
+		c_erro4:
+		 goto_xy 0, 0
+		 call apaga_ecran
+		 MOSTRA Erro_Campo
+		 call LE_TECLA
+		 cmp AL, 13			;enter
+		 je menu_0
+		 jmp c_erro
+		s_erro4:
+		 call bonus	
+jmp menu_0
+;-------------------------------------------------------------------------------
+
 fim:
 	GOTO_XY 24,0
 	call	apaga_ecran	
