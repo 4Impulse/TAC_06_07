@@ -1159,11 +1159,7 @@ JOGO PROC
 	int		10h			
 	mov		char, al		; Guarda o Caracter que está na posição do Cursor
 	mov		Cor, ah			; Guarda a cor que está na posição do Cursor		
-	
-	goto_xy	POSx,POSy	; Vai para posição do cursor
-								mov		ah, 02h
-								mov		dl, 254		; Coloca AVATAR
-								int		21H	
+
 
 CICLO:	goto_xy	POSx,POSy	; Vai para nova possição
 		mov 	ah, 08h
@@ -1494,12 +1490,6 @@ BONUS PROC
 	mov ah, pos_Iy
 	mov PosBonusY, ah
 
-	mov ah, PosBonusX
-	mov PosBonusXa, ah
-
-	mov ah, pos_Iy
-	mov PosBonusYa, ah
-
 
 	goto_xy	PosBonusX,PosBonusY		; Vai para nova possição
 	mov 	ah, 08h			; Guarda o Caracter que está na posição do Cursor
@@ -1759,11 +1749,6 @@ p_onze1:
 
 ;------MOVIMENTOS	
 ciclo_pass:
-			goto_xy	PosBonusX,PosBonusy	; Vai para posição do cursor
-								mov		ah, 02h
-								mov		dl, 254		; Coloca AVATAR
-								int		21H	
-
 				
 			mov al, pass_dados
 			cmp n_pass, al
@@ -1820,18 +1805,21 @@ ciclo_pass:
 								goto_xy	PosBonusXa,PosBonusYa	; Vai para a posição anterior do cursor
 								mov		ah, 02h
 								mov		dl, char	; Repoe Caracter guardado 
-								int		21H	
+								int		21H		
+
 								goto_xy	PosBonusX,PosBonusY	; Vai para posição do cursor
 								mov		al, PosBonusX	; Guarda a posição do cursor
 								mov		PosBonusXa, al
 								mov		al, PosBonusY	; Guarda a posição do cursor
 								mov 	PosBonusYa, al
 								jmp 	ciclo_pass
-						Volta: 						;retorna a pos Anterior
+						Volta: 	
+										;retorna a pos Anterior
 								mov al,PosBonusYa
 								mov PosBonusY,al
 								mov al, PosBonusXa
 								mov	PosBonusX,al
+
 								jmp ciclo_pass
 						ENCONTROU:
 								call ganhou
@@ -1983,7 +1971,7 @@ menu_4:
 		s_erro4:
 		 call bonus	
 jmp menu_0
-;-------------------------------------------------------------------------------
+;----------------------------------------------------j---------------------------
 
 fim:
 	GOTO_XY 24,0
