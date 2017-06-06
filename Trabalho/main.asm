@@ -1455,13 +1455,23 @@ SELECT_SAVED endp
 ;------------------------------------------------------------------------
 Clear_BONUS proc
 	mov bx, 0 ;imaginar em C == i=0;
-CICLO:
+CICLO1:
+		mov al, str_cls[bx]
+	cmp al, 0
+	JE etapa2		
+		mov str_bonus[bx], al ;copia
+		inc BX 	;i++
+    JMP CICLO1 ;jump not equal
+
+etapa2: 		
+ mov bx, 0 ;imaginar em C == i=0;
+CICLO2:
 		mov al, str_cls[bx]
 	cmp al, 0
 	JE Sai		
-		mov str_bonus[bx], al ;copia
+		mov dir_passos[bx], al ;copia
 		inc BX 	;i++
-    JMP CICLO ;jump not equal
+    JMP CICLO2 ;jump not equal
  
     Sai:
     	ret
@@ -1667,6 +1677,7 @@ trata_hex proc
 		mov BP, 0
 		mov contaCiclo, 0			
 looping:
+		mov pass_dados, 0
 		mov al, str_bonus[BP]
 
 		
@@ -1747,37 +1758,40 @@ p_onze1:
 		mov n_pass, 4
 
 ;------MOVIMENTOS	
-		mov pass_dados, 0
 ciclo_pass:
-			
-			inc pass_dados
+			goto_xy	PosBonusX,PosBonusy	; Vai para posição do cursor
+								mov		ah, 02h
+								mov		dl, 254		; Coloca AVATAR
+								int		21H	
+
+				
 			mov al, pass_dados
 			cmp n_pass, al
 			je cont
-			
-	ciclo_dir:
+			inc pass_dados
+
+		dir_norte:	
 					cmp n_dir, 00
-					jne dir_sul
+					jne 	dir_sul
 					dec		PosBonusY
 					jmp ciclo_movi
 		dir_sul:	
 					cmp n_dir, 01
-					jne dir_este
+					jne 	dir_este
 					inc 	PosBonusY
 					jmp ciclo_movi
 		dir_este:	
 					cmp n_dir, 10
-					jne dir_oeste
+					jne 	dir_oeste
 					inc 	PosBonusX
 					jmp ciclo_movi
 		dir_oeste:	
 					cmp n_dir, 11
-					jne cont
+					jne 	ciclo_pass
 					dec 	PosBonusX
+					jmp ciclo_movi
 
 				ciclo_movi:
-						;inc pass_dados
-						CICLO:	
 								goto_xy	PosBonusX,PosBonusy	; Vai para nova possição
 								mov 	ah, 08h
 								mov		bh,0		; numero da página
@@ -1812,6 +1826,7 @@ ciclo_pass:
 								mov		PosBonusXa, al
 								mov		al, PosBonusY	; Guarda a posição do cursor
 								mov 	PosBonusYa, al
+								jmp 	ciclo_pass
 						Volta: 						;retorna a pos Anterior
 								mov al,PosBonusYa
 								mov PosBonusY,al
